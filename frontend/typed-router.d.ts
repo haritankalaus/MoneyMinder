@@ -65,6 +65,7 @@ declare module 'vue-router/auto/routes' {
     '/dashboard/reports/': RouteRecordInfo<'/dashboard/reports/', '/dashboard/reports', Record<never, never>, Record<never, never>>,
     '/dashboard/settings/': RouteRecordInfo<'/dashboard/settings/', '/dashboard/settings', Record<never, never>, Record<never, never>>,
     '/expenses/': RouteRecordInfo<'/expenses/', '/expenses', Record<never, never>, Record<never, never>>,
+    '/expenses/components/UpcomingPayments': RouteRecordInfo<'/expenses/components/UpcomingPayments', '/expenses/components/UpcomingPayments', Record<never, never>, Record<never, never>>,
     '/home': RouteRecordInfo<'/home', '/home', Record<never, never>, Record<never, never>>,
     '/home/': RouteRecordInfo<'/home/', '/home', Record<never, never>, Record<never, never>>,
     '/home/components/Features/': RouteRecordInfo<'/home/components/Features/', '/home/components/Features', Record<never, never>, Record<never, never>>,
@@ -74,6 +75,7 @@ declare module 'vue-router/auto/routes' {
     '/payments/': RouteRecordInfo<'/payments/', '/payments', Record<never, never>, Record<never, never>>,
     '/payments/components/PaymentDialog': RouteRecordInfo<'/payments/components/PaymentDialog', '/payments/components/PaymentDialog', Record<never, never>, Record<never, never>>,
     '/register/': RouteRecordInfo<'/register/', '/register', Record<never, never>, Record<never, never>>,
+    '/test/': RouteRecordInfo<'/test/', '/test', Record<never, never>, Record<never, never>>,
     '/transactions/': RouteRecordInfo<'/transactions/', '/transactions', Record<never, never>, Record<never, never>>,
     '/transactions/components/TransactionDialog': RouteRecordInfo<'/transactions/components/TransactionDialog', '/transactions/components/TransactionDialog', Record<never, never>, Record<never, never>>,
   }
