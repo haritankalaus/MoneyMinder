@@ -18,60 +18,10 @@
                 <v-row align="stretch">
                   <!-- Pending Payments Table -->
                   <v-col cols="12" md="9">
-                    <v-card>
-                      <v-card-title class="text-h6">
-                        Upcoming Payments
-                      </v-card-title>
-                      <v-data-table
-                        :headers="[
-                          { title: 'Name', key: 'name', align: 'start' },
-                          { title: 'Type', key: 'type' },
-                          { title: 'Amount', key: 'amount' },
-                          { title: 'Due Date', key: 'dueDate' },
-                          { title: 'Status', key: 'status' },
-                          { title: 'Actions', key: 'actions', sortable: false }
-                        ]"
-                        :items="paymentsDueRef"
-                        :sort-by="[{ key: 'dueDate', order: 'asc' }]"
-                        class="elevation-1"
-                      >
-                        <template v-slot:item.type="{ item }">
-                          <v-chip
-                            :color="item.isCard ? 'purple' : 'blue'"
-                            size="small"
-                          >
-                            {{ item.isCard ? 'Credit Card' : 'Bill' }}
-                          </v-chip>
-                        </template>
-                        <template v-slot:item.amount="{ item }">
-                          {{ formatCurrency(item.amount) }}
-                        </template>
-                        <template v-slot:item.dueDate="{ item }">
-                          <span :class="getDueDateClass(item.dueDate)">
-                            {{ formatDateOnly(item.dueDate) }}
-                          </span>
-                        </template>
-                        <template v-slot:item.status="{ item }">
-                          <v-chip
-                            :color="getStatusColor(item.status)"
-                            :text-color="getStatusTextColor(item.status)"
-                            size="small"
-                          >
-                            {{ item.status }}
-                          </v-chip>
-                        </template>
-                        <template v-slot:item.actions="{ item }">
-                          <v-btn
-                            size="small"
-                            color="primary"
-                            variant="text"
-                            @click="recordPayment(item)"
-                          >
-                            Record Payment
-                          </v-btn>
-                        </template>
-                      </v-data-table>
-                    </v-card>
+                    <UpcomingPayments
+                      :payments-due="paymentsDueRef"
+                      @record-payment="recordPayment"
+                    />
                   </v-col>
                   <v-col cols="12" md="3">
                     <!-- Statistics Cards -->
@@ -446,11 +396,31 @@
       </v-card>
     </v-col>
   </v-row>
+      
+  <v-menu v-model="menu" :close-on-content-click="false">
+        <template #activator="{ props }">
+          <v-text-field
+            v-model="formattedDate"
+            label="Select date"
+            prepend-icon="mdi-calendar"
+            readonly
+            v-bind="props"
+          ></v-text-field>
+        </template>
+        <v-date-picker
+         range  
+          v-model="datenew"
+          @update:modelValue="menu = false"
+          class="responsive-date-picker"
+        ></v-date-picker>
+      </v-menu>
+  
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { format } from 'date-fns'
+import UpcomingPayments from './components/UpcomingPayments.vue'
 import { useExpenseStore } from '@/stores/useExpenseStore'
 import { useAccountStore } from '@/stores/useAccountStore'
 import { useBillStore } from '@/stores/useBillStore'
@@ -478,6 +448,15 @@ const dueDateMenu = ref(false)
 const search = ref('')
 const loading = ref(false)
 const expenses = ref([])
+
+
+const datenew = ref(null);
+const menu = ref(false);
+
+const formattedDate = computed(() => {
+  console.log('datenew' + datenew.value)
+  return datenew.value ? new Date(datenew.value).toLocaleDateString() : '';
+});
 
 // Stats data
 const stats = computed(() => {
@@ -1038,6 +1017,28 @@ onMounted(async () => {
     grid-column: span 7;
   }
 }
+
+/* Responsive adjustments */
+.responsive-date-picker {
+  width: 100%;
+  max-width: 328px;
+}
+
+@media (max-width: 600px) {
+  .responsive-date-picker .v-picker__body {
+    padding: 4px;
+  }
+  
+  .responsive-date-picker .v-date-picker-month__day {
+    min-width: 36px;
+    height: 36px;
+  }
+}
+
+.v-menu__content {
+  max-width: 100vw !important;
+}
+
 </style>
 <route lang="yaml">
   meta:

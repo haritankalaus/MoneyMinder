@@ -100,7 +100,7 @@
               </v-btn>
             </v-card-title>
             <v-divider></v-divider>
-            <accounts-list />
+            <AccountsList />
           </v-card>
         </v-col>
         <!-- Bills Overview -->
@@ -138,39 +138,15 @@
               </v-btn>
             </v-card-title>
             <v-divider></v-divider>
-            <v-list lines="two">
-              <v-list-item v-if="upcomingPayments.length === 0">
-                <template v-slot:prepend>
-                  <v-icon icon="i-iconoir-calendar" class="bg-info-subtle" color="info"></v-icon>
-                </template>
-                <v-list-item-title>No upcoming payments</v-list-item-title>
-                <v-list-item-subtitle>All caught up!</v-list-item-subtitle>
-              </v-list-item>
-              <v-list-item
-                v-for="payment in upcomingPayments"
-                :key="payment.id"
-                :title="payment.name"
-                :subtitle="`Due ${formatDateOnly(payment.dueDate)} • ${payment.isCard ? 'Credit Card' : 'Bill'}`"
-              >
-                <template v-slot:prepend>
-                  <v-icon
-                    :icon="payment.isCard ? 'i-iconoir-credit-card' : 'i-iconoir-receipt'"
-                    :class="payment.isCard ? 'bg-error-subtle' : 'bg-info-subtle'"
-                    :color="payment.isCard ? 'error' : 'info'"
-                  ></v-icon>
-                </template>
-                <template v-slot:append>
-                  <div class="text-caption" :class="getDueDateClass(payment.dueDate)">
-                    ${{ formatNumber(payment.amount) }}
-                  </div>
-                </template>
-              </v-list-item>
-            </v-list>
+            <UpcomingPayments
+              :payments-due="paymentsDue"
+              @record-payment="handleRecordPayment"
+            />
           </v-card>
         </v-col>
       </v-row>
-<!-- Upcoming Payments and Recent Transactions -->
-<v-row class="mt-6">        
+      <!-- Upcoming Payments and Recent Transactions -->
+      <v-row class="mt-6">        
         <!-- Recent Transactions -->
         <v-col cols="12" md="6">
           <v-card>
@@ -247,6 +223,7 @@
 
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { PieChart, BarChart } from 'echarts/charts'
@@ -260,6 +237,7 @@ import VChart from 'vue-echarts'
 import { useDashboardStore } from '@/stores/useDashboardStore'
 import { useExpenseStore } from '@/stores/useExpenseStore'
 import BillsOverview from './components/BillsOverview.vue'
+import UpcomingPayments from '@/pages/expenses/components/UpcomingPayments.vue'
 
 // Register ECharts components
 use([
@@ -274,6 +252,7 @@ use([
 
 const dashboardStore = useDashboardStore()
 const expenseStore = useExpenseStore()
+const router = useRouter()
 
 // Fetch dashboard data on mount
 onMounted(async () => {
@@ -403,6 +382,33 @@ const incomeExpenseChartOption = computed(() => {
 // Utility function to format numbers
 const formatNumber = (value: number) => {
   return value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+// Computed property for upcoming payments
+const paymentsDue = computed(() => {
+  const today = new Date()
+  const currentMonth = today.getMonth()
+  const currentYear = today.getFullYear()
+  
+  return expenseStore.expenses
+    .filter(expense => {
+      const expenseDate = new Date(expense.dueDate)
+      return expenseDate.getMonth() === currentMonth && 
+             expenseDate.getFullYear() === currentYear
+    })
+    .map(expense => ({
+      ...expense,
+      isCard: expense.type === 'CREDIT_CARD'
+    }))
+})
+
+// Handler for recording payments
+function handleRecordPayment(payment) {
+  // Navigate to expenses page with the payment details
+  router.push({
+    name: 'expenses',
+    query: { record: 'payment', id: payment.id }
+  })
 }
 </script>
 

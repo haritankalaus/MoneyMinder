@@ -34,5 +34,6 @@ declare module 'vue' {
     ThemeToggler: typeof import('./components/blocks/ThemeToggler.vue')['default']
     ToggleDirection: typeof import('./components/blocks/ToggleDirection.vue')['default']
     TransactionDialog: typeof import('./pages/transactions/components/TransactionDialog.vue')['default']
+    UpcomingPayments: typeof import('./pages/expenses/components/UpcomingPayments.vue')['default']
   }
 }

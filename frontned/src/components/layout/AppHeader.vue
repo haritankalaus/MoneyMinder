@@ -75,6 +75,13 @@
 
         <v-list>
 
+          <v-list-item to="/dashboard">
+            <template v-slot:prepend>
+              <v-icon>mdi-view-dashboard</v-icon>
+            </template>
+            <v-list-item-title>Dashboard</v-list-item-title>
+          </v-list-item>
+
           <v-list-item to="/profile">
             <template v-slot:prepend>
               <v-icon>mdi-account</v-icon>
