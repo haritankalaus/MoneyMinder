@@ -19,6 +19,93 @@ The project is organized into two main components:
   - `spring-security`: Handles authentication and JWT token management
   - `account-manager`: Manages core financial data and business logic
 
+## Architecture Overview
+
+The application follows a cloud-native architecture leveraging AWS services for scalability, reliability, and security:
+
+### Infrastructure Components
+
+#### Frontend Hosting
+- Static Vue 3 files hosted on Amazon S3
+- CloudFront distribution for CDN and HTTPS
+  - Edge locations for global content delivery
+  - Custom domain configuration
+  - WebSocket support for real-time features
+  - Caching strategies for optimal performance
+- Automatic SSL/TLS certificate management via ACM
+- S3 bucket versioning for rollback capability
+
+#### Backend Services
+- Spring Boot applications deployed to AWS Elastic Beanstalk
+  - Multi-container Docker environments
+  - Auto-scaling based on CPU/Memory metrics
+  - Rolling deployments for zero downtime
+  - Environment variables for configuration
+- Application Load Balancer (ALB) for traffic distribution
+  - SSL termination
+  - Health checks and automatic instance replacement
+  - Path-based routing for microservices
+- Elastic Beanstalk worker environments for background jobs
+
+#### Database
+- Amazon RDS (MySQL/PostgreSQL) for data persistence
+  - Multi-AZ deployment for high availability
+  - Read replicas for improved performance
+  - Automated backups with 30-day retention
+  - Point-in-time recovery capability
+- Connection pooling for optimal resource utilization
+- Encryption at rest using AWS KMS
+- Performance Insights for query optimization
+
+#### CI/CD Pipeline
+- AWS CodePipeline for automated deployments
+  - Source control integration with GitHub
+  - Branch-based deployment strategies
+  - Manual approval gates for production
+- CodeBuild for building and testing applications
+  - Custom build environments using Docker
+  - Caching for faster builds
+  - Test reports and code coverage metrics
+- Artifact management in S3
+- Deployment notifications via SNS
+
+#### Security Infrastructure
+- HTTPS encryption via AWS Certificate Manager (ACM)
+  - Automatic certificate renewal
+  - Custom domain validation
+- Security groups for network access control
+  - Inbound rules limited to necessary ports
+  - VPC isolation for backend services
+- IAM roles and policies
+  - Least privilege principle
+  - Service-linked roles
+  - Resource-based policies
+- AWS WAF for web application firewall
+  - DDoS protection
+  - IP-based rate limiting
+  - SQL injection prevention
+
+#### Monitoring and Logging
+- CloudWatch for centralized monitoring
+  - Custom metrics and dashboards
+  - Log aggregation and analysis
+  - Alarm configuration for critical metrics
+- X-Ray for distributed tracing
+  - Service map visualization
+  - Performance bottleneck identification
+  - Error tracking and debugging
+- AWS Systems Manager
+  - Parameter Store for secrets
+  - Session Manager for secure shell access
+  - Patch Manager for OS updates
+
+### Cost Optimization
+- Free tier eligible components where possible
+- Auto-scaling for cost-effective resource utilization
+- S3 lifecycle policies for old artifacts
+- Reserved instances for predictable workloads
+- Cost allocation tags for billing analysis
+
 ## Features
 
 - 🔐 Secure user authentication
