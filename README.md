@@ -1,4 +1,4 @@
-# MyMoney - Personal Finance Management Application
+# MoneyMinder - Personal Finance Management Application
 
 MyMoney is a modern, full-stack personal finance management application that helps users track their expenses, manage budgets, and gain insights into their financial health.
 
