@@ -95,8 +95,8 @@
             hover
           >
             <template v-slot:item.amount="{ item }">
-              <span :class="{ 'text-success': item.type === 'INCOME', 'text-error': item.type === 'EXPENSE' }">
-                {{ item.type === 'INCOME' ? '+' : '-' }} ${{ formatNumber(item.amount) }}
+              <span :class="{ 'text-success': item.type === 'income', 'text-error': item.type === 'expense' }">
+                {{ item.type === 'income' ? '+' : '-' }} ${{ formatNumber(item.amount) }}
               </span>
             </template>
             <template v-slot:item.date="{ item }">
@@ -104,7 +104,7 @@
             </template>
             <template v-slot:item.type="{ item }">
               <v-chip
-                :color="item.type === 'INCOME' ? 'success' : 'error'"
+                :color="item.type === 'income' ? 'success' : 'error'"
                 size="small"
               >
                 {{ item.type }}
@@ -183,7 +183,7 @@ const error = ref<string | null>(null)
 const transactions = ref<Transaction[]>([])
 const showCreateDialog = ref(false)
 const showDeleteDialog = ref(false)
-const selectedTransaction = ref<Transaction | null>(null)
+const selectedTransaction = ref<Transaction | undefined>(undefined)
 const total = ref(0)
 
 const filters = ref({
@@ -202,7 +202,7 @@ const categories = [
   { id: '5', name: 'Entertainment' }
 ]
 
-const headers = [
+const headers: any = [
   { title: 'Date', key: 'date', sortable: true },
   { title: 'Description', key: 'description' },
   { title: 'Category', key: 'category.name' },
@@ -220,7 +220,9 @@ async function fetchTransactions() {
   error.value = null
   try {
     const response = await dashboardService.getTransactions({
-      type: filters.value.type === 'All' ? undefined : filters.value.type.toUpperCase(),
+      type: filters.value.type === 'All' 
+        ? undefined 
+        : (filters.value.type.toLowerCase() as 'income' | 'expense'),
       categoryId: filters.value.categoryId || undefined,
       startDate: filters.value.startDate ? new Date(filters.value.startDate) : undefined,
       endDate: filters.value.endDate ? new Date(filters.value.endDate) : undefined
@@ -241,8 +243,8 @@ function formatNumber(value: number): string {
   }).format(value)
 }
 
-function formatDate(date: string): string {
-  return format(new Date(date), 'MMM dd, yyyy')
+function formatDate(date: string | Date): string {
+  return format(date instanceof Date ? date : new Date(date), 'MMM dd, yyyy')
 }
 
 function handleEdit(transaction: Transaction) {
@@ -258,7 +260,7 @@ async function handleSaveTransaction(transaction: Omit<Transaction, 'id'> | Tran
       await dashboardService.addTransaction(transaction)
     }
     showCreateDialog.value = false
-    selectedTransaction.value = null
+    selectedTransaction.value = undefined
     fetchTransactions()
   } catch (e: any) {
     error.value = e.message || 'Failed to save transaction'
@@ -276,7 +278,7 @@ async function handleDeleteTransaction() {
   try {
     await dashboardService.deleteTransaction(selectedTransaction.value.id)
     showDeleteDialog.value = false
-    selectedTransaction.value = null
+    selectedTransaction.value = undefined
     fetchTransactions()
   } catch (e: any) {
     error.value = e.message || 'Failed to delete transaction'
@@ -294,4 +296,3 @@ async function handleDeleteTransaction() {
   meta:
     layout: DashboardLayout
   </route>
-

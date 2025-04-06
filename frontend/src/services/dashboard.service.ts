@@ -1,12 +1,21 @@
 import type { DashboardData, Transaction, Payment } from '@/types/dashboard'
 import { apiService } from '@/services/api.service'
+import type { AxiosResponse } from 'axios'
+
+interface TransactionResponse {
+  transactions: Transaction[]
+  total: number
+}
 
 class DashboardService {
   private readonly BASE_URL = '/api/dashboard'
 
   async getDashboardData(): Promise<DashboardData> {
-    const data  = await apiService.get<DashboardData>(`${this.BASE_URL}`)
-    return this.transformDashboardData(data)
+    const response: AxiosResponse<DashboardData> = await apiService.get(`${this.BASE_URL}`)
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return this.transformDashboardData(response.data)
   }
 
   async getTransactions(params: {
@@ -17,10 +26,13 @@ class DashboardService {
     type?: 'income' | 'expense'
     categoryId?: string
   }): Promise<{ transactions: Transaction[]; total: number }> {
-    const { data } = await apiService.get(`${this.BASE_URL}/transactions`, { params })
+    const response: AxiosResponse<TransactionResponse> = await apiService.get(`${this.BASE_URL}/transactions`, { params })
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
     return {
-      transactions: data.transactions.map(this.transformTransaction),
-      total: data.total
+      transactions: response.data.transactions.map(this.transformTransaction),
+      total: response.data.total
     }
   }
 
@@ -29,18 +41,27 @@ class DashboardService {
     startDate?: Date
     endDate?: Date
   }): Promise<Payment[]> {
-    const { data } = await apiService.get<Payment[]>(`${this.BASE_URL}/payments`, { params })
-    return data.map(this.transformPayment)
+    const response: AxiosResponse<Payment[]> = await apiService.get(`${this.BASE_URL}/upcoming-payments`, { params })
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return response.data.map(this.transformPayment)
   }
 
   async addTransaction(transaction: Omit<Transaction, 'id' | 'date'>): Promise<Transaction> {
-    const { data } = await apiService.post<Transaction>(`${this.BASE_URL}/transactions`, transaction)
-    return this.transformTransaction(data)
+    const response: AxiosResponse<Transaction> = await apiService.post(`${this.BASE_URL}/transactions`, transaction)
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return this.transformTransaction(response.data)
   }
 
   async updateTransaction(id: string, transaction: Partial<Transaction>): Promise<Transaction> {
-    const { data } = await apiService.put<Transaction>(`${this.BASE_URL}/transactions/${id}`, transaction)
-    return this.transformTransaction(data)
+    const response: AxiosResponse<Transaction> = await apiService.put(`${this.BASE_URL}/transactions/${id}`, transaction)
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return this.transformTransaction(response.data)
   }
 
   async deleteTransaction(id: string): Promise<void> {
@@ -48,17 +69,23 @@ class DashboardService {
   }
 
   async addPayment(payment: Omit<Payment, 'id'>): Promise<Payment> {
-    const { data } = await apiService.post<Payment>(`${this.BASE_URL}/payments`, payment)
-    return this.transformPayment(data)
+    const response: AxiosResponse<Payment> = await apiService.post(`${this.BASE_URL}/upcoming-payments`, payment)
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return this.transformPayment(response.data)
   }
 
   async updatePayment(id: string, payment: Partial<Payment>): Promise<Payment> {
-    const { data } = await apiService.put<Payment>(`${this.BASE_URL}/payments/${id}`, payment)
-    return this.transformPayment(data)
+    const response: AxiosResponse<Payment> = await apiService.put(`${this.BASE_URL}/upcoming-payments/${id}`, payment)
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return this.transformPayment(response.data)
   }
 
   async deletePayment(id: string): Promise<void> {
-    await apiService.delete(`${this.BASE_URL}/payments/${id}`)
+    await apiService.delete(`${this.BASE_URL}/upcoming-payments/${id}`)
   }
 
   private transformDashboardData(data: any): DashboardData {
@@ -73,7 +100,10 @@ class DashboardService {
         balance: Number(data.stats?.balance || 0),
         monthlyIncome: Number(data.stats?.monthlyIncome || 0),
         monthlyExpenses: Number(data.stats?.monthlyExpenses || 0),
-        monthlyBalance: Number(data.stats?.monthlyBalance || 0)
+        monthlyBalance: Number(data.stats?.monthlyBalance || 0),
+        savingsGoal: Number(data.stats?.savingsGoal || 0),
+        savingsProgress: Number(data.stats?.savingsProgress || 0),
+        ...(data.stats?.nextPaydate && { nextPaydate: new Date(data.stats.nextPaydate) })
       },
       upcomingPayments: Array.isArray(data.upcomingPayments) 
         ? data.upcomingPayments.map(this.transformPayment)
@@ -102,9 +132,9 @@ class DashboardService {
   private transformTransaction(transaction: any): Transaction {
     return {
       id: transaction.id,
-      date: new Date(transaction.date),
-      description: transaction.description,
+      title: transaction.title,
       amount: transaction.amount,
+      date: new Date(transaction.date),
       type: transaction.type,
       category: {
         id: transaction.category.id,
@@ -112,13 +142,14 @@ class DashboardService {
         color: transaction.category.color,
         icon: transaction.category.icon
       },
-      notes: transaction.notes
+      ...(transaction.description && { description: transaction.description })
     }
   }
 
   private transformPayment(payment: any): Payment {
     return {
       id: payment.id,
+      title: payment.title,
       description: payment.description,
       amount: payment.amount,
       dueDate: new Date(payment.dueDate),
@@ -129,7 +160,7 @@ class DashboardService {
         icon: payment.category.icon
       },
       status: payment.status,
-      notes: payment.notes
+      ...(payment.recurrence && { recurrence: payment.recurrence })
     }
   }
 }

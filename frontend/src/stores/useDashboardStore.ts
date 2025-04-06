@@ -61,7 +61,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     
     return dashboardData.value.spendingByCategory.map(item => ({
       value: item.amount,
-      name: item.category.name
+      name: item.name
     }))
   })
 
@@ -70,7 +70,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
     
     const monthlyData = dashboardData.value.monthlyFinancials
     return {
-      months: monthlyData.map(m => m.month.toLocaleString('default', { month: 'short' })),
+      months: monthlyData.map(m => {
+        const [year, month] = m.month.split('-').map(Number)
+        return new Date(year, month - 1).toLocaleString('default', { month: 'short' })
+      }),
       income: monthlyData.map(m => m.income),
       expenses: monthlyData.map(m => m.expenses)
     }

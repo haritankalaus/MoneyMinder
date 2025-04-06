@@ -61,6 +61,7 @@ declare module 'vue-router/auto/routes' {
     '/dashboard/overview/components/RentalByType': RouteRecordInfo<'/dashboard/overview/components/RentalByType', '/dashboard/overview/components/RentalByType', Record<never, never>, Record<never, never>>,
     '/dashboard/overview/components/RentalFrequency': RouteRecordInfo<'/dashboard/overview/components/RentalFrequency', '/dashboard/overview/components/RentalFrequency', Record<never, never>, Record<never, never>>,
     '/dashboard/overview/components/StatCardOverview': RouteRecordInfo<'/dashboard/overview/components/StatCardOverview', '/dashboard/overview/components/StatCardOverview', Record<never, never>, Record<never, never>>,
+    '/dashboard/overview/components/UpcomingPayments': RouteRecordInfo<'/dashboard/overview/components/UpcomingPayments', '/dashboard/overview/components/UpcomingPayments', Record<never, never>, Record<never, never>>,
     '/dashboard/rentals/': RouteRecordInfo<'/dashboard/rentals/', '/dashboard/rentals', Record<never, never>, Record<never, never>>,
     '/dashboard/reports/': RouteRecordInfo<'/dashboard/reports/', '/dashboard/reports', Record<never, never>, Record<never, never>>,
     '/dashboard/settings/': RouteRecordInfo<'/dashboard/settings/', '/dashboard/settings', Record<never, never>, Record<never, never>>,

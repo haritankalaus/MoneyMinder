@@ -62,6 +62,18 @@ export const useBudgetStore = defineStore('budget', () => {
     }
   }
 
+  async function fetchBudgetById(id: string) {
+    isLoading.value = true
+    error.value = null
+    try {
+      currentBudget.value = await budgetService.getBudget(id)
+    } catch (e: any) {
+      error.value = e.message
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   async function fetchAnalytics(params = {}) {
     isLoading.value = true
     error.value = null
@@ -79,7 +91,16 @@ export const useBudgetStore = defineStore('budget', () => {
     error.value = null
     try {
       const newBudget = await budgetService.createBudget(budget)
-      budgets.value = [newBudget, ...budgets.value]
+      const budgetSummary: BudgetSummary = {
+        id: newBudget.id,
+        period: newBudget.period,
+        totalBudget: newBudget.totalBudget,
+        totalActual: newBudget.totalActual,
+        status: newBudget.status,
+        progress: newBudget.totalBudget > 0 ? (newBudget.totalActual / newBudget.totalBudget) * 100 : 0,
+        remainingDays: calculateRemainingDays(newBudget.period)
+      }
+      budgets.value = [budgetSummary, ...budgets.value]
       total.value++
       return newBudget
     } catch (e: any) {
@@ -90,6 +111,13 @@ export const useBudgetStore = defineStore('budget', () => {
     }
   }
 
+  function calculateRemainingDays(period: string): number {
+    const [year, month] = period.split('-').map(Number)
+    const endOfMonth = new Date(year, month, 0)
+    const today = new Date()
+    return Math.max(0, Math.ceil((endOfMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
+  }
+
   async function updateBudget(id: string, budget: Partial<Budget>) {
     isLoading.value = true
     error.value = null
@@ -98,8 +126,17 @@ export const useBudgetStore = defineStore('budget', () => {
       if (currentBudget.value?.id === id) {
         currentBudget.value = updatedBudget
       }
+      const budgetSummary: BudgetSummary = {
+        id: updatedBudget.id,
+        period: updatedBudget.period,
+        totalBudget: updatedBudget.totalBudget,
+        totalActual: updatedBudget.totalActual,
+        status: updatedBudget.status,
+        progress: updatedBudget.totalBudget > 0 ? (updatedBudget.totalActual / updatedBudget.totalBudget) * 100 : 0,
+        remainingDays: calculateRemainingDays(updatedBudget.period)
+      }
       budgets.value = budgets.value.map(b => 
-        b.id === id ? updatedBudget : b
+        b.id === id ? budgetSummary : b
       )
       return updatedBudget
     } catch (e: any) {
@@ -145,6 +182,7 @@ export const useBudgetStore = defineStore('budget', () => {
     // Actions
     fetchBudgets,
     fetchCurrentBudget,
+    fetchBudgetById,
     fetchAnalytics,
     createBudget,
     updateBudget,

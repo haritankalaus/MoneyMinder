@@ -3,6 +3,7 @@ import { ApiService } from './api.service'
 export interface LoginCredentials {
     username: string
     password: string
+    rememberMe?: boolean
 }
 
 export interface RegisterData {
@@ -66,11 +67,11 @@ export class AuthService {
     }
 
     public async forgotPassword(email: string): Promise<void> {
-        return this.api.post('/api/auth/forgot-password', { email })
+        await this.api.post('/api/auth/forgot-password', { email })
     }
 
     public async verifyOtp(email: string, otp: string, newPassword: string): Promise<void> {
-        return this.api.post('/api/auth/verify-otp', { email, otp, newPassword })
+        await this.api.post('/api/auth/verify-otp', { email, otp, newPassword })
     }
 
     public async getProfile(): Promise<AuthResponse['user']> {
@@ -78,48 +79,5 @@ export class AuthService {
     }
 }
 
-
 // Create auth service using the API service
-/*export class AuthService {
-    private api: ApiService
-
-    constructor() {
-        this.api = ApiService.getInstance()
-    }
-
-    public async login(email: string, password: string) {
-        try {
-            const response = await this.api.post<{ token: string }>('/auth/login', {
-                email,
-                password
-            })
-            this.api.setToken(response.token)
-            return response
-        } catch (error) {
-            throw error
-        }
-    }
-
-    public async register(userData: {
-        name: string
-        email: string
-        password: string
-    }) {
-        try {
-            const response = await this.api.post<{ token: string }>('/auth/register', userData)
-            this.api.setToken(response.token)
-            return response
-        } catch (error) {
-            throw error
-        }
-    }
-
-    public logout(): void {
-        this.api.clearToken()
-    }
-
-    public isAuthenticated(): boolean {
-        return !!this.api.getToken()
-    }
-}*/
 export const authService = new AuthService()

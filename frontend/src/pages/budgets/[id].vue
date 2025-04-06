@@ -201,7 +201,7 @@ const progress = computed(() => {
 
 onMounted(async () => {
   const budgetId = route.params.id as string
-  await budgetStore.fetchBudget(budgetId)
+  await budgetStore.fetchBudgetById(budgetId)
 })
 
 function formatPeriod(period: string): string {

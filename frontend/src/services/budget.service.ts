@@ -1,5 +1,11 @@
 import type { Budget, BudgetSummary, BudgetAnalytics } from '@/types/budget'
 import { apiService } from '@/services/api.service'
+import type { AxiosResponse } from 'axios'
+
+interface BudgetResponse {
+  content: BudgetSummary[]
+  totalElements: number
+}
 
 class BudgetService {
   private readonly BASE_URL = '/api/budgets'
@@ -11,31 +17,46 @@ class BudgetService {
     endPeriod?: string
     status?: string
   }): Promise<{ budgets: BudgetSummary[]; total: number }> {
-    const { data } = await apiService.get(`${this.BASE_URL}`, { params })
+    const response: AxiosResponse<BudgetResponse> = await apiService.get(`${this.BASE_URL}`, { params })
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
     return {
-      budgets: data.content.map(this.transformBudgetSummary),
-      total: data.totalElements
+      budgets: response.data.content.map(this.transformBudgetSummary),
+      total: response.data.totalElements
     }
   }
 
   async getBudget(id: string): Promise<Budget> {
-    const { data } = await apiService.get<Budget>(`${this.BASE_URL}/${id}`)
-    return this.transformBudget(data)
+    const response: AxiosResponse<Budget> = await apiService.get(`${this.BASE_URL}/${id}`)
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return this.transformBudget(response.data)
   }
 
   async getCurrentBudget(): Promise<Budget> {
-    const { data } = await apiService.get<Budget>(`${this.BASE_URL}/current`)
-    return this.transformBudget(data)
+    const response: AxiosResponse<Budget> = await apiService.get(`${this.BASE_URL}/current`)
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return this.transformBudget(response.data)
   }
 
   async createBudget(budget: Omit<Budget, 'id'>): Promise<Budget> {
-    const { data } = await apiService.post<Budget>(this.BASE_URL, budget)
-    return this.transformBudget(data)
+    const response: AxiosResponse<Budget> = await apiService.post(`${this.BASE_URL}`, budget)
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return this.transformBudget(response.data)
   }
 
   async updateBudget(id: string, budget: Partial<Budget>): Promise<Budget> {
-    const { data } = await apiService.put<Budget>(`${this.BASE_URL}/${id}`, budget)
-    return this.transformBudget(data)
+    const response: AxiosResponse<Budget> = await apiService.put(`${this.BASE_URL}/${id}`, budget)
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return this.transformBudget(response.data)
   }
 
   async deleteBudget(id: string): Promise<void> {
@@ -46,47 +67,67 @@ class BudgetService {
     startPeriod?: string
     endPeriod?: string
   }): Promise<BudgetAnalytics> {
-    const { data } = await apiService.get<BudgetAnalytics>(`${this.BASE_URL}/analytics`, { params })
-    return this.transformBudgetAnalytics(data)
+    const response: AxiosResponse<BudgetAnalytics> = await apiService.get(`${this.BASE_URL}/analytics`, { params })
+    if (!response || !('data' in response)) {
+      throw new Error('Invalid response format')
+    }
+    return response.data
   }
 
-  private transformBudget(budget: any): Budget {
+  private transformBudget(data: any): Budget {
     return {
-      ...budget,
-      period: budget.period,
-      totalBudget: Number(budget.totalBudget),
-      totalActual: Number(budget.totalActual),
-      categories: budget.categories?.map((category: any) => ({
-        ...category,
-        budgetAmount: Number(category.budgetAmount),
-        actualAmount: Number(category.actualAmount)
-      }))
+      id: data.id,
+      period: data.period,
+      totalBudget: Number(data.totalBudget),
+      totalActual: Number(data.totalActual),
+      person: data.person,
+      categories: data.categories.map((cat: any) => ({
+        id: cat.id,
+        category: cat.category,
+        budgetAmount: Number(cat.budgetAmount),
+        actualAmount: Number(cat.actualAmount),
+        notes: cat.notes
+      })),
+      status: data.status,
+      notes: data.notes
     }
   }
 
-  private transformBudgetSummary(summary: any): BudgetSummary {
+  private transformBudgetSummary(data: any): BudgetSummary {
+    const totalBudget = Number(data.totalBudget);
+    const totalActual = Number(data.totalActual);
+    const progress = totalBudget > 0 ? (totalActual / totalBudget) * 100 : 0;
+
+    // Calculate remaining days in the budget period
+    const [year, month] = data.period.split('-').map(Number);
+    const startOfMonth = new Date(year, month - 1, 1);
+    const endOfMonth = new Date(year, month, 0);
+    const today = new Date();
+    const remainingDays = Math.max(0, Math.ceil((endOfMonth.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+
     return {
-      ...summary,
-      period: summary.period,
-      totalBudget: Number(summary.totalBudget),
-      totalActual: Number(summary.totalActual),
-      progress: Number(summary.progress),
-      remainingDays: Number(summary.remainingDays)
+      id: data.id,
+      period: data.period,
+      totalBudget,
+      totalActual,
+      status: data.status,
+      progress,
+      remainingDays
     }
   }
 
-  private transformBudgetAnalytics(analytics: any): BudgetAnalytics {
+  private transformBudgetAnalytics(data: any): BudgetAnalytics {
     return {
-      ...analytics,
-      averageBudget: Number(analytics.averageBudget),
-      totalBudgets: Number(analytics.totalBudgets),
-      overspentBudgets: Number(analytics.overspentBudgets),
-      topCategories: analytics.topCategories?.map((category: any) => ({
+      ...data,
+      averageBudget: Number(data.averageBudget),
+      totalBudgets: Number(data.totalBudgets),
+      overspentBudgets: Number(data.overspentBudgets),
+      topCategories: data.topCategories?.map((category: any) => ({
         ...category,
         percentage: Number(category.percentage),
         amount: Number(category.amount)
       })),
-      monthlyComparison: analytics.monthlyComparison?.map((month: any) => ({
+      monthlyComparison: data.monthlyComparison?.map((month: any) => ({
         ...month,
         planned: Number(month.planned),
         actual: Number(month.actual)

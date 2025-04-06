@@ -33,6 +33,9 @@ export interface FinancialStats {
   monthlyIncome: number;
   monthlyExpenses: number;
   monthlyBalance: number;
+  nextPaydate?: Date;
+  savingsGoal: number;
+  savingsProgress: number; // Percentage of savings goal achieved this month
 }
 
 export interface CategorySpending {

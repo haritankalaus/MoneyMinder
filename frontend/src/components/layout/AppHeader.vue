@@ -68,7 +68,7 @@
             class="user-button"
           >
             <v-icon start>mdi-account-circle</v-icon>
-            {{ authStore.currentUser?.firstName || 'User' }}
+            {{ authStore.currentUser?.name || 'User' }}
             <v-icon end>mdi-chevron-down</v-icon>
           </v-btn>
         </template>

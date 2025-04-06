@@ -77,7 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
             secureStorage.setItem('user', authData.user)
             
             token.value = authData.token
-            refreshTokenValue.value = authData.refreshToken
+            refreshTokenValue.value = authData.refreshToken ?? null
             user.value = authData.user
             startSessionTimer()
         } catch (error) {
@@ -135,13 +135,14 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Authentication methods
     const login = async (credentials: LoginCredentials) => {
+        loading.value = true
+        error.value = null
+        
         try {
-            loading.value = true
-            error.value = null
             const response = await authService.login(credentials)
             saveAuthState(response)
             return response
-        } catch (err) {
+        } catch (err: any) {
             handleError(err)
             throw err
         } finally {
@@ -150,13 +151,42 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const register = async (userData: RegisterData) => {
+        loading.value = true
+        error.value = null
+        
         try {
-            loading.value = true
-            error.value = null
             const response = await authService.register(userData)
             saveAuthState(response)
             return response
-        } catch (err) {
+        } catch (err: any) {
+            handleError(err)
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    const forgotPassword = async (email: string) => {
+        loading.value = true
+        error.value = null
+        
+        try {
+            await authService.forgotPassword(email)
+        } catch (err: any) {
+            handleError(err)
+            throw err
+        } finally {
+            loading.value = false
+        }
+    }
+
+    const verifyOtp = async (email: string, otp: string, newPassword: string) => {
+        loading.value = true
+        error.value = null
+        
+        try {
+            await authService.verifyOtp(email, otp, newPassword)
+        } catch (err: any) {
             handleError(err)
             throw err
         } finally {
@@ -224,6 +254,8 @@ export const useAuthStore = defineStore('auth', () => {
         register,
         logout,
         refreshToken,
+        forgotPassword,
+        verifyOtp,
         initializeAuth,
         clearError: () => error.value = null,
         resetSessionTimer

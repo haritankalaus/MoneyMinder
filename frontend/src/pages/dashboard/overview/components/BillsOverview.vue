@@ -95,17 +95,17 @@
                 :key="bill.id"
                 :title="bill.name"
                 :subtitle="`Due ${bill.dueDate} • Amount: $${formatNumber(bill.amount)}`"
-                :class="{ 'payment-due': isPaymentDue(bill.dueDate) }"
+                :class="{ 'payment-due': isPaymentDue(new Date(bill.dueDate || '').getDate()) }"
               >
                 <template v-slot:prepend>
-                  <v-icon :icon="isPaymentDue(bill.dueDate) ? 'i-iconoir-warning-triangle' : 'i-iconoir-receipt'" 
-                         :class="isPaymentDue(bill.dueDate) ? 'bg-error-subtle' : 'bg-info-subtle'" 
-                         :color="isPaymentDue(bill.dueDate) ? 'error' : 'info'">
+                  <v-icon :icon="isPaymentDue(new Date(bill.dueDate || '').getDate()) ? 'i-iconoir-warning-triangle' : 'i-iconoir-receipt'" 
+                         :class="isPaymentDue(new Date(bill.dueDate || '').getDate()) ? 'bg-error-subtle' : 'bg-info-subtle'" 
+                         :color="isPaymentDue(new Date(bill.dueDate || '').getDate()) ? 'error' : 'info'">
                   </v-icon>
                 </template>
                 <template v-slot:append>
                   <div class="text-caption">
-                    <span v-if="isPaymentDue(bill.dueDate)" class="text-error font-weight-bold mr-2">Due!</span>
+                    <span v-if="isPaymentDue(new Date(bill.dueDate || '').getDate())" class="text-error font-weight-bold mr-2">Due!</span>
                     {{ bill.type }}
                   </div>
                 </template>
@@ -120,6 +120,7 @@
 import { computed, onMounted } from 'vue'
 import { useAccountStore } from '@/stores/useAccountStore'
 import { AccountType } from '@/services/account.service'
+import type { Bill } from '@/types/bill'
 
 const accountStore = useAccountStore()
 
@@ -137,9 +138,8 @@ const creditCards = computed(() =>
   accountStore.getAccountsByType(AccountType.CREDIT_CARD)
 )
 
-const otherBills = computed(() => []) // This will be implemented when we have a bills service
+const otherBills = computed<Bill[]>(() => []) // This will be implemented when we have a bills service
 
-// Computed properties to filter and sort accounts
 const sortedLoans = computed(() => {
   return [...loans.value].sort((a, b) => {
     const aDueDay = a.loanDetails?.paymentDueDay ?? 32
@@ -164,15 +164,11 @@ const sortedCreditCards = computed(() => {
   })
 })
 
-const sortedOtherBills = computed(() => {
-  return [...otherBills.value].sort((a, b) => {
-    const aIsDue = isPaymentDue(a.dueDate)
-    const bIsDue = isPaymentDue(b.dueDate)
-    if (aIsDue && !bIsDue) return -1
-    if (!aIsDue && bIsDue) return 1
-    return (a.dueDate ?? 32) - (b.dueDate ?? 32)
-  })
-})
+const sortedOtherBills = computed(() => 
+  [...otherBills.value].sort((a, b) => 
+    new Date(a.dueDate || '').getTime() - new Date(b.dueDate || '').getTime()
+  )
+)
 
 // Utility function to calculate total amount
 const getTotalAmount = (items: any[]) => {

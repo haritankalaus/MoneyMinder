@@ -5,7 +5,7 @@ import Components from 'unplugin-vue-components/vite'
 import Layouts from 'vite-plugin-vue-layouts'
 import Pages from 'vite-plugin-pages'
 import Unocss from 'unocss/vite'
-import VueI18n from '@intlify/vite-plugin-vue-i18n'
+import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import VueRouter from 'unplugin-vue-router/vite'
 import { defineConfig } from 'vite'
 import path from 'path'
@@ -31,23 +31,20 @@ export default defineConfig({
             ],
         }),
         Layouts({
-            layoutsDirs: ['src/layouts', 'src/layouts/dashboard'],
-            defaultLayout: 'HomeLayout',
+            layoutsDirs: 'src/layouts',
+            defaultLayout: 'default'
         }),
         AutoImport({
             imports: [
                 'vue',
                 'vue-router',
-                'vue-i18n',
-                'vue/macros',
                 '@vueuse/head',
                 '@vueuse/core',
-                {
-                    vuetify: ['useTheme'],
-                },
+                'vue-i18n',
+                'pinia'
             ],
             dts: 'src/auto-imports.d.ts',
-            dirs: ['src/composables', 'src/store'],
+            dirs: ['src/composables', 'src/stores'],
             vueTemplate: true,
         }),
         Components({
@@ -58,7 +55,7 @@ export default defineConfig({
             dts: 'src/components.d.ts',
             dirs: ['src/components', 'src/**/components'],
         }),
-        VueI18n({
+        VueI18nPlugin({
             runtimeOnly: true,
             compositionOnly: true,
             fullInstall: true,

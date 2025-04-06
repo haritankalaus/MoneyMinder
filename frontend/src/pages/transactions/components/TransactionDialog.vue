@@ -9,10 +9,21 @@
             <v-col cols="12" md="6">
               <v-select
                 v-model="formData.type"
-                :items="['INCOME', 'EXPENSE']"
+                :items="['income', 'expense']"
                 label="Type"
                 :rules="[v => !!v || 'Type is required']"
                 required
+              />
+            </v-col>
+
+            <!-- Title -->
+            <v-col cols="12" md="6">
+              <v-text-field
+                v-model="formData.title"
+                label="Title"
+                :rules="[v => !!v || 'Title is required']"
+                required
+                placeholder="Enter transaction title"
               />
             </v-col>
 
@@ -62,16 +73,6 @@
                 label="Category"
                 :rules="[v => !!v || 'Category is required']"
                 required
-              />
-            </v-col>
-
-            <!-- Notes -->
-            <v-col cols="12">
-              <v-textarea
-                v-model="formData.notes"
-                label="Notes"
-                rows="3"
-                placeholder="Optional transaction notes"
               />
             </v-col>
           </v-row>
@@ -131,33 +132,42 @@ const isEdit = computed(() => !!props.transaction)
 
 // Mock categories - replace with actual categories from your store
 const categories = [
-  { id: '1', name: 'Food & Dining' },
-  { id: '2', name: 'Transportation' },
-  { id: '3', name: 'Shopping' },
-  { id: '4', name: 'Bills & Utilities' },
-  { id: '5', name: 'Entertainment' }
+  { id: '1', name: 'Housing', color: '#4CAF50', icon: 'mdi-home' },
+  { id: '2', name: 'Transportation', color: '#2196F3', icon: 'mdi-car' },
+  { id: '3', name: 'Food', color: '#FF9800', icon: 'mdi-food' },
+  { id: '4', name: 'Utilities', color: '#9C27B0', icon: 'mdi-flash' },
+  { id: '5', name: 'Entertainment', color: '#F44336', icon: 'mdi-movie' }
 ]
 
-const defaultFormData = {
-  type: 'EXPENSE',
+interface FormData {
+  type: 'income' | 'expense';
+  title: string;
+  date: string;
+  description?: string;
+  amount: number;
+  categoryId: string;
+}
+
+const defaultFormData: FormData = {
+  type: 'expense',
+  title: '',
   date: new Date().toISOString().split('T')[0],
   description: '',
   amount: 0,
-  categoryId: '',
-  notes: ''
+  categoryId: ''
 }
 
-const formData = ref({ ...defaultFormData })
+const formData = ref<FormData>({ ...defaultFormData })
 
 watch(() => props.transaction, (newTransaction) => {
   if (newTransaction) {
     formData.value = {
       type: newTransaction.type,
+      title: newTransaction.title,
       date: new Date(newTransaction.date).toISOString().split('T')[0],
       description: newTransaction.description,
       amount: newTransaction.amount,
-      categoryId: newTransaction.category.id,
-      notes: newTransaction.notes || ''
+      categoryId: newTransaction.category.id
     }
   } else {
     formData.value = { ...defaultFormData }
@@ -170,20 +180,23 @@ async function handleSubmit() {
 
   loading.value = true
   try {
-    const transactionData = {
+    const category = categories.find(c => c.id === formData.value.categoryId)
+    if (!category) throw new Error('Category not found')
+
+    const transaction = {
+      ...(props.transaction?.id ? { id: props.transaction.id } : {}),
       type: formData.value.type,
+      title: formData.value.title,
       date: new Date(formData.value.date),
       description: formData.value.description,
       amount: formData.value.amount,
-      category: categories.find(c => c.id === formData.value.categoryId)!,
-      notes: formData.value.notes
+      category
     }
 
-    if (props.transaction) {
-      emit('save', { ...transactionData, id: props.transaction.id })
-    } else {
-      emit('save', transactionData)
-    }
+    emit('save', transaction)
+    emit('update:modelValue', false)
+  } catch (error) {
+    console.error('Failed to save transaction:', error)
   } finally {
     loading.value = false
   }

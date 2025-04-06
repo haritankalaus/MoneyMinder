@@ -19,8 +19,10 @@
                   <!-- Pending Payments Table -->
                   <v-col cols="12" md="9">
                     <UpcomingPayments
-                      :payments-due="paymentsDueRef"
+                      :payments="paymentsDueRef"
                       @record-payment="recordPayment"
+                      @edit-payment="editItem"
+                      @delete-payment="deleteExpense"
                     />
                   </v-col>
                   <v-col cols="12" md="3">
@@ -80,34 +82,42 @@
                         class="elevation-1"
                       >
                         <template v-slot:item.amount="{ item }">
-                          ${{ item.amount.toFixed(2) }}
+                          <template v-if="item">
+                            ${{ item.amount.toFixed(2) }}
+                          </template>
                         </template>
                         <template v-slot:item.dueDate="{ item }">
-                          {{ formatDate(item.dueDate) }}
+                          <template v-if="item">
+                            {{ formatDate(item.dueDate) }}
+                          </template>
                         </template>
                         <template v-slot:item.status="{ item }">
-                          <v-chip
-                            :color="getStatusColor(item.status)"
-                            :text-color="getStatusTextColor(item.status)"
-                            size="small"
-                          >
-                            {{ item.status }}
-                          </v-chip>
+                          <template v-if="item">
+                            <v-chip
+                              :color="getStatusColor(item.status)"
+                              :text-color="getStatusTextColor(item.status)"
+                              size="small"
+                            >
+                              {{ item.status }}
+                            </v-chip>
+                          </template>
                         </template>
                         <template v-slot:item.actions="{ item }">
-                          <v-icon
-                            size="small"
-                            class="me-2"
-                            @click="editItem(item)"
-                          >
-                            mdi-pencil
-                          </v-icon>
-                          <v-icon
-                            size="small"
-                            @click="deleteExpense(item)"
-                          >
-                            mdi-delete
-                          </v-icon>
+                          <template v-if="item">
+                            <v-icon
+                              size="small"
+                              class="me-2"
+                              @click="editItem(item)"
+                            >
+                              mdi-pencil
+                            </v-icon>
+                            <v-icon
+                              size="small"
+                              @click="deleteExpense(item)"
+                            >
+                              mdi-delete
+                            </v-icon>
+                          </template>
                         </template>
                       </v-data-table>
                     </v-card>
@@ -212,15 +222,16 @@
                                 :value="card.id"
                                 @click="handleAccountSelection('CREDIT_CARD', card.id)"
                                 :active="selectedAccount === card.id"
-                                :class="{ 'selected-item': selectedAccount === card.id }"
                               >
                                 <template v-slot:prepend>
                                   <v-icon color="purple">mdi-credit-card</v-icon>
                                 </template>
                                 <v-list-item-title>{{ card.name }}</v-list-item-title>
                                 <v-list-item-subtitle>
-                                  Available: {{ formatCurrency(card.creditCardDetails.creditLimit - card.balance) }}
-                                  | Due: {{ card.creditCardDetails.paymentDueDay }}th
+                                  Available: {{ formatCurrency((card.creditCardDetails?.creditLimit ?? 0) - (card.balance ?? 0)) }}
+                                  <template v-if="card.creditCardDetails?.paymentDueDay">
+                                    | Due: {{ card.creditCardDetails.paymentDueDay }}th
+                                  </template>
                                 </v-list-item-subtitle>
                               </v-list-item>
                               <v-divider v-if="index < creditCards.length - 1"></v-divider>
@@ -265,16 +276,22 @@
                                 :value="loan.id"
                                 @click="handleAccountSelection('LOAN', loan.id)"
                                 :active="selectedAccount === loan.id"
-                                :class="{ 'selected-item': selectedAccount === loan.id }"
                               >
                                 <template v-slot:prepend>
                                   <v-icon color="blue-grey">mdi-bank</v-icon>
                                 </template>
                                 <v-list-item-title>{{ loan.name }}</v-list-item-title>
                                 <v-list-item-subtitle>
-                                  Monthly: {{ formatCurrency(loan.loanDetails.monthlyPayment) }}
-                                  | Due: {{ loan.loanDetails.paymentDueDay }}th
-                                  | Remaining: {{ formatCurrency(loan.loanDetails.remainingAmount) }}
+                                  <template v-if="loan.loanDetails">
+                                    Monthly: {{ formatCurrency(loan.loanDetails.monthlyPayment ?? 0) }}
+                                    <template v-if="loan.loanDetails.paymentDueDay">
+                                      | Due: {{ loan.loanDetails.paymentDueDay }}th
+                                    </template>
+                                    | Remaining: {{ formatCurrency(loan.loanDetails.remainingAmount ?? 0) }}
+                                  </template>
+                                  <template v-else>
+                                    No loan details available
+                                  </template>
                                 </v-list-item-subtitle>
                               </v-list-item>
                               <v-divider v-if="index < loans.length - 1"></v-divider>
@@ -417,41 +434,62 @@
   
 </template>
 
-<script setup>
+<script  setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { format } from 'date-fns'
 import UpcomingPayments from './components/UpcomingPayments.vue'
 import { useExpenseStore } from '@/stores/useExpenseStore'
 import { useAccountStore } from '@/stores/useAccountStore'
 import { useBillStore } from '@/stores/useBillStore'
-import { ExpenseType } from '@/types/expense'
+import { ExpenseStatus, ExpenseType, type Expense, type ExpenseRequest } from '@/types/expense'
+import { RecurrenceType, BillType, type Bill } from '@/types/bill'
+import type { Account, CreditCardDetails, LoanDetails } from '@/services/account.service'
+import { AccountType } from '@/services/account.service'
+import type { TableItem, PaymentStatus } from '@/types/payment'
+
+// Type guard to check if an account is a credit card account
+const isCreditCardAccount = (account: Account): account is Account & {
+  type: AccountType.CREDIT_CARD;
+  creditCardDetails: NonNullable<CreditCardDetails>;
+} => {
+  return account.type === AccountType.CREDIT_CARD && account.creditCardDetails !== undefined;
+};
 
 const expenseStore = useExpenseStore()
 const accountStore = useAccountStore()
 const billStore = useBillStore()
 
-const activeTab = ref('expenses-list')
-const expandedPanel = ref(null)
-const expandedAccountPanel = ref(null)
-const selectedBill = ref(null)
-const selectedAccount = ref(null)
-const amount = ref(null)
-const date = ref(new Date().toISOString().substr(0, 10))
-const description = ref('')
-const paymentMethod = ref(null)
-const status = ref('PENDING')
-const recurringPeriod = ref('NONE')
-const dueDate = ref(null)
-const notificationEnabled = ref(true)
-const dateMenu = ref(false)
-const dueDateMenu = ref(false)
-const search = ref('')
-const loading = ref(false)
-const expenses = ref([])
+// Calculate minimum payment based on credit limit and interest rate
+const calculateMinimumPayment = (creditLimit: number, interestRate: number): number => {
+  // Most credit cards require either a percentage of the balance (2-4%) or a fixed amount ($25-35), whichever is greater
+  const minimumPercentage = 0.03; // 3% is a common minimum payment percentage
+  const minimumFixedAmount = 25; // $25 is a common minimum payment amount
+  
+  const percentageBasedPayment = creditLimit * minimumPercentage;
+  return Math.max(percentageBasedPayment, minimumFixedAmount);
+};
 
+const activeTab = ref<string>('expenses-list')
+const expandedPanel = ref<BillType | null>(null)
+const expandedAccountPanel = ref<number | null>(null)
+const selectedBill = ref<number | null>(null)
+const selectedAccount = ref<number | null>(null)
+const amount = ref<number | null>(null)
+const date = ref<string>(new Date().toISOString().substr(0, 10))
+const description = ref<string>('')
+const paymentMethod = ref<string | null>(null)
+const status = ref<ExpenseStatus>(ExpenseStatus.PENDING)
+const recurringPeriod = ref<RecurrenceType>(RecurrenceType.ONE_TIME)
+const dueDate = ref<string | null>(null)
+const notificationEnabled = ref<boolean>(true)
+const dateMenu = ref<boolean>(false)
+const dueDateMenu = ref<boolean>(false)
+const search = ref<string>('')
+const loading = ref<boolean>(false)
+const expenses = ref<TableItem[]>([])
 
-const datenew = ref(null);
-const menu = ref(false);
+const datenew = ref<string | null>(null);
+const menu = ref<boolean>(false);
 
 const formattedDate = computed(() => {
   console.log('datenew' + datenew.value)
@@ -464,32 +502,32 @@ const stats = computed(() => {
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
   const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0)
 
-  const thisMonthExpenses = expenseStore.expenses.filter(expense => {
-    const expenseDate = new Date(expense.dueDate)
+  const thisMonthExpenses = expenseStore.expenses.filter((expense: Expense) => {
+    const expenseDate = new Date(expense.date)
     return expenseDate >= firstDayOfMonth && expenseDate <= lastDayOfMonth
   })
 
   const paidThisMonth = thisMonthExpenses
-    .filter(expense => expense.status === 'PAID')
-    .reduce((total, expense) => total + expense.amount, 0)
+    .filter((expense: Expense) => expense.status === ExpenseStatus.COMPLETED)
+    .reduce((total: number, expense: Expense) => total + expense.amount, 0)
 
   const totalDueThisMonth = thisMonthExpenses
-    .reduce((total, expense) => total + expense.amount, 0)
+    .reduce((total: number, expense: Expense) => total + expense.amount, 0)
 
   const nextPayDate = new Date() // This should come from your income/payroll settings
   nextPayDate.setDate(nextPayDate.getDate() + 14) // Assuming bi-weekly pay
 
   const dueByNextPay = expenseStore.expenses
-    .filter(expense => {
-      const dueDate = new Date(expense.dueDate)
-      return dueDate <= nextPayDate && expense.status !== 'PAID'
+    .filter((expense: Expense) => {
+      const dueDate = new Date(expense.date)
+      return dueDate <= nextPayDate && expense.status !== ExpenseStatus.COMPLETED
     })
-    .reduce((total, expense) => total + expense.amount, 0)
+    .reduce((total: number, expense: Expense) => total + expense.amount, 0)
 
   // This should be calculated based on your available income minus upcoming expenses
   const incomeAvailable = accountStore.accounts
     .filter(account => account.type === 'CHECKING' || account.type === 'SAVINGS')
-    .reduce((total, account) => total + account.balance, 0)
+    .reduce((total: number, account: Account) => total + account.balance, 0)
 
   return {
     totalDueThisMonth,
@@ -501,40 +539,44 @@ const stats = computed(() => {
 })
 
 // Table headers
-const headers = [
+const headers : any = [
   { title: 'Description', key: 'description' },
   { title: 'Amount', key: 'amount', align: 'end' },
   { title: 'Due Date', key: 'dueDate' },
   { title: 'Status', key: 'status' },
   { title: 'Actions', key: 'actions', sortable: false }
-]
+];
 
-const getStatusColor = (status) => {
-  const colors = {
-    'PAID': 'success',
-    'PENDING': 'warning',
-    'OVERDUE': 'error'
+const getStatusColor = (status: PaymentStatus): string => {
+  switch (status) {
+    case 'paid':
+      return 'success'
+    case 'pending':
+      return 'warning'
+    case 'overdue':
+      return 'error'
+    default:
+      return 'grey'
   }
-  return colors[status] || 'grey'
 }
 
-const getStatusTextColor = (status) => {
-  return status === 'PENDING' ? 'black' : 'white'
+const getStatusTextColor = (status: PaymentStatus): string => {
+  return status === 'pending' ? 'black' : 'white'
 }
 
-const formatDate = (date) => {
+const formatDate = (date: string | Date): string => {
   if (!date) return ''
-  const d = date instanceof Date ? date : new Date(date)
-  return format(d, 'MMM dd, yyyy')
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  return format(dateObj, 'MMM dd, yyyy')
 }
 
-const formatDateOnly = (date) => {
+const formatDateOnly = (date: string | Date): string => {
   if (!date) return ''
-  const d = date instanceof Date ? date : new Date(date)
-  return format(d, 'MMM dd')
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  return format(dateObj, 'yyyy-MM-dd')
 }
 
-const getDueDateClass = (dueDate) => {
+const getDueDateClass = (dueDate: string | Date): string => {
   if (!dueDate) return 'text-primary'
   
   const dueDateObj = dueDate instanceof Date ? dueDate : new Date(dueDate)
@@ -552,30 +594,33 @@ const getDueDateClass = (dueDate) => {
   }
 }
 
-const formatBillType = (type) => {
-  return type.split('_').map(word => 
+const formatBillType = (type: string | number): string => {
+  return String(type).split('_').map(word => 
     word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
   ).join(' ')
 }
 
-const getBillTypeColor = (type) => {
-  const colors = {
-    UTILITIES: 'blue',
-    RENT: 'purple',
-    MORTGAGE: 'purple',
-    INSURANCE: 'green',
-    PHONE: 'orange',
-    INTERNET: 'orange',
-    GROCERIES: 'red',
-    TRANSPORTATION: 'brown',
-    ENTERTAINMENT: 'pink',
-    HEALTHCARE: 'teal',
-    OTHER: 'grey'
+const getBillTypeColor = (type: BillType): string => {
+  const colors: Record<BillType, string> = {
+    [BillType.RECURRING]: 'primary',
+    [BillType.HOME_LOAN]: 'error',
+    [BillType.EMI]: 'warning',
+    [BillType.UTILITIES]: 'success',
+    [BillType.GROCERIES]: 'info',
+    [BillType.ENTERTAINMENT]: 'purple',
+    [BillType.HEALTHCARE]: 'pink',
+    [BillType.EDUCATION]: 'orange',
+    [BillType.TRANSPORTATION]: 'blue',
+    [BillType.OTHER]: 'grey'
   }
   return colors[type] || 'grey'
 }
 
-const formatCurrency = (value) => {
+const getBillTypeTextColor = (type: BillType): string => {
+  return type === BillType.EMI ? 'black' : 'white'
+}
+
+const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD'
@@ -599,15 +644,15 @@ const getSelectedExpense = computed(() =>
 )
 
 const creditCards = computed(() => {
-  return accountStore.accounts.filter(account => account.type === 'CREDIT_CARD')
+  return accountStore.accounts.filter(isCreditCardAccount);
 })
 
 const loans = computed(() => {
-  return accountStore.accounts.filter(account => account.type === 'LOAN')
+  return accountStore.accounts.filter((account: Account) => account.type === 'LOAN')
 })
 
-const groupedBills = computed(() => {
-  const grouped = {}
+const groupedBills = computed<Record<BillType, Bill[]>>(() => {
+  const grouped: Record<BillType, Bill[]> = {} as Record<BillType, Bill[]>
   billStore.bills.forEach(bill => {
     if (!grouped[bill.type]) {
       grouped[bill.type] = []
@@ -626,20 +671,20 @@ const paymentMethods = [
 ]
 
 const statusOptions = [
-  'PAID',
-  'PENDING',
-  'OVERDUE',
+  ExpenseStatus.COMPLETED,
+  ExpenseStatus.PENDING,
+  'OVERDUE' as const,
+  ExpenseStatus.CANCELLED
 ]
 
 const recurringPeriods = [
-  'NONE',
-  'DAILY',
-  'WEEKLY',
-  'MONTHLY',
-  'YEARLY',
+  { text: 'One Time', value: RecurrenceType.ONE_TIME },
+  { text: 'Weekly', value: RecurrenceType.WEEKLY },
+  { text: 'Monthly', value: RecurrenceType.MONTHLY },
+  { text: 'Yearly', value: RecurrenceType.YEARLY }
 ]
 
-const paymentsDue = computed(() => {
+const payments = computed(() => {
   const today = new Date()
   const currentMonth = today.getMonth()
   const currentYear = today.getFullYear()
@@ -647,121 +692,96 @@ const paymentsDue = computed(() => {
   const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0)
 
   // Get credit cards
-  const creditCards = accountStore.accounts
-    .filter(account => account.type === 'CREDIT_CARD')
-    .map(card => {
-      const dueDay = card.creditCardDetails?.paymentDueDay || 1
-      const dueDate = new Date(currentYear, currentMonth, dueDay)
-      
-      // Check if there's an existing expense for this card this month
-      const existingExpense = expenseStore.expenses.find(expense => 
-        expense.accountId === card.id &&
-        expense.type === 'CREDIT_CARD' &&
-        new Date(expense.dueDate) >= firstDayOfMonth &&
-        new Date(expense.dueDate) <= lastDayOfMonth
-      )
-
-      if (existingExpense) {
-        return {
-          id: existingExpense.id,
-          name: card.name,
-          amount: existingExpense.amount,
-          dueDate: new Date(existingExpense.dueDate),
-          status: existingExpense.status,
-          isCard: true,
-          originalItem: existingExpense
-        }
+  const creditCardPayments: TableItem[] = accountStore.accounts
+    .filter(isCreditCardAccount)
+    .map(card => ({
+      id: `cc-${card.id}-${currentMonth}-${currentYear}`,
+      title: card.name,
+      amount: calculateMinimumPayment(
+        card.creditCardDetails.creditLimit,
+        card.creditCardDetails.interestRate
+      ),
+      dueDate: new Date(currentYear, currentMonth, card.creditCardDetails.paymentDueDay),
+      status: 'pending' as PaymentStatus,
+      isCard: true,
+      originalItem: card as Account & {
+        type: AccountType.CREDIT_CARD;
+        creditCardDetails: NonNullable<CreditCardDetails>;
       }
-
-      return {
-        id: card.id,
-        name: card.name,
-        amount: card.balance,
-        dueDate: dueDate,
-        status: 'PENDING',
-        isCard: true,
-        originalItem: card
-      }
-    })
+    }))
 
   // Get bills
-  const bills = billStore.bills
-    .map(bill => {
-      // Check if there's an existing expense for this bill this month
-      const existingExpense = expenseStore.expenses.find(expense => 
-        expense.billId === bill.id &&
-        expense.type === 'BILL' &&
-        new Date(expense.dueDate) >= firstDayOfMonth &&
-        new Date(expense.dueDate) <= lastDayOfMonth
-      )
-
-      if (existingExpense) {
-        return {
-          id: existingExpense.id,
-          name: bill.name,
-          amount: existingExpense.amount,
-          dueDate: new Date(existingExpense.dueDate),
-          status: existingExpense.status,
-          isCard: false,
-          originalItem: existingExpense
-        }
-      }
-
-      // Calculate due date for new expense
-      let dueDate
-      if (bill.recurrenceType === 'ONE_TIME') {
-        dueDate = new Date(bill.dueDate)
-      } else if (bill.recurrenceType === 'MONTHLY' && bill.dayOfMonth) {
-        dueDate = new Date(currentYear, currentMonth, bill.dayOfMonth)
-      } else if (bill.recurrenceType === 'WEEKLY' && bill.dayOfWeek) {
-        // Find first occurrence of day in current month
-        dueDate = new Date(firstDayOfMonth)
-        // Find first occurrence of day in current month
-        while (dueDate.getDay() !== bill.dayOfWeek || dueDate < firstDayOfMonth) {
-          dueDate.setDate(dueDate.getDate() + 1)
-        }
-      }
-
-      if (!dueDate || dueDate < firstDayOfMonth || dueDate > lastDayOfMonth) {
-        return null
-      }
-
-      return {
-        id: bill.id,
-        name: bill.name,
-        amount: bill.amount,
-        dueDate: dueDate,
-        status: 'PENDING',
-        isCard: false,
-        originalItem: bill
-      }
+  const billPayments: TableItem[] = billStore.bills
+    .filter(bill => bill.dueDate != null)
+    .filter(bill => {
+      const billDueDate = new Date(bill.dueDate!)
+      return billDueDate >= firstDayOfMonth && billDueDate <= lastDayOfMonth
     })
-    .filter(bill => bill !== null) // Remove null entries
+    .map(bill => ({
+      id: `bill-${bill.id}-${currentMonth}-${currentYear}`,
+      title: bill.name,
+      amount: bill.amount,
+      dueDate: new Date(bill.dueDate!),
+      status: 'pending' as PaymentStatus,
+      isCard: false,
+      originalItem: bill
+    }))
 
-  const allPayments = [...creditCards, ...bills]
-
-  // Split into upcoming and settled payments
-  const upcomingPayments = allPayments.filter(payment => payment.status !== 'PAID')
-  const settledPayments = allPayments.filter(payment => payment.status === 'PAID')
-
-  // Sort by due date
-  upcomingPayments.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
-  settledPayments.sort((a, b) => b.dueDate.getTime() - a.dueDate.getTime()) // Most recent first
-
-  return {
-    upcoming: upcomingPayments,
-    settled: settledPayments
-  }
+  return [...creditCardPayments, ...billPayments].sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
 })
 
-const paymentsDueRef = computed(() => paymentsDue.value.upcoming)
-const completedPaymentsRef = computed(() => paymentsDue.value.settled)
+const paymentsDueRef = computed(() => payments.value)
+
+const completedPaymentsRef = computed<TableItem[]>(() => {
+  const today = new Date()
+  const currentMonth = today.getMonth()
+  const currentYear = today.getFullYear()
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1)
+  const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0)
+
+  // Get credit cards
+  const creditCardPayments: TableItem[] = accountStore.accounts
+    .filter(isCreditCardAccount)
+    .map(card => ({
+      id: `cc-${card.id}-${currentMonth}-${currentYear}`,
+      title: card.name,
+      amount: calculateMinimumPayment(
+        card.creditCardDetails.creditLimit,
+        card.creditCardDetails.interestRate
+      ),
+      dueDate: new Date(currentYear, currentMonth, card.creditCardDetails.paymentDueDay),
+      status: 'pending' as PaymentStatus,
+      isCard: true,
+      originalItem: card
+    }))
+
+  // Get bills
+  const billPayments: TableItem[] = billStore.bills
+    .filter((bill): bill is Bill & { dueDate: string } => 
+      bill.dueDate !== undefined && bill.dueDate !== null
+    )
+    .filter(bill => {
+      const billDueDate = new Date(bill.dueDate)
+      return billDueDate >= firstDayOfMonth && billDueDate <= lastDayOfMonth
+    })
+    .map(bill => ({
+      id: `bill-${bill.id}-${currentMonth}-${currentYear}`,
+      title: bill.name,
+      amount: bill.amount,
+      dueDate: new Date(bill.dueDate),
+      status: 'pending' as PaymentStatus,
+      isCard: false,
+      originalItem: bill
+    }))
+
+  return [...creditCardPayments, ...billPayments].sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+})
 
 const creditCardAccounts = computed(() => {
-  return accountStore.accounts.filter(account => account.type === 'CREDIT_CARD')
+  return accountStore.accounts.filter(isCreditCardAccount)
 })
 
-const handleAccountSelection = (type, id) => {
+const handleAccountSelection = (type: 'CREDIT_CARD' | 'LOAN', id: number): void => {
   // Clear bill selection when account is selected
   selectedBill.value = null
   
@@ -769,13 +789,16 @@ const handleAccountSelection = (type, id) => {
   amount.value = null
   description.value = ''
   dueDate.value = null
-  recurringPeriod.value = 'NONE'
+  recurringPeriod.value = RecurrenceType.ONE_TIME
   
   const account = accountStore.accounts.find(a => a.id === id)
   if (account) {
     selectedAccount.value = id
-    if (type === 'CREDIT_CARD') {
-      amount.value = account.creditCardDetails.creditLimit - account.balance
+    if (type === 'CREDIT_CARD' && account.creditCardDetails) {
+      amount.value = calculateMinimumPayment(
+        account.creditCardDetails.creditLimit,
+        account.creditCardDetails.interestRate
+      )
       description.value = `Payment for ${account.name}`
       // Set due date to the payment due day of current month
       const today = new Date()
@@ -785,9 +808,9 @@ const handleAccountSelection = (type, id) => {
       if (today.getDate() > dueDay) {
         dueDate.setMonth(dueDate.getMonth() + 1)
       }
-      dueDate.value = dueDate.toISOString().split('T')[0]
-      recurringPeriod.value = 'MONTHLY'
-    } else if (type === 'LOAN') {
+      selectedDate.value = dueDate.toISOString().split('T')[0]
+      recurringPeriod.value = RecurrenceType.MONTHLY
+    } else if (type === 'LOAN' && account.loanDetails) {
       amount.value = account.loanDetails.monthlyPayment
       description.value = `Payment for ${account.name}`
       // Set due date to the payment due day of current month
@@ -798,8 +821,8 @@ const handleAccountSelection = (type, id) => {
       if (today.getDate() > dueDay) {
         dueDate.setMonth(dueDate.getMonth() + 1)
       }
-      dueDate.value = dueDate.toISOString().split('T')[0]
-      recurringPeriod.value = 'MONTHLY'
+      selectedDate.value = dueDate.toISOString().split('T')[0]
+      recurringPeriod.value = RecurrenceType.MONTHLY
     }
     // Collapse the panel after selection
     expandedPanel.value = null
@@ -807,7 +830,7 @@ const handleAccountSelection = (type, id) => {
   }
 }
 
-const handleBillSelection = (id) => {
+const handleBillSelection = (id: number): void => {
   // Clear account selection when bill is selected
   selectedAccount.value = null
   
@@ -815,22 +838,22 @@ const handleBillSelection = (id) => {
   amount.value = null
   description.value = ''
   dueDate.value = null
-  recurringPeriod.value = 'NONE'
+  recurringPeriod.value = RecurrenceType.ONE_TIME
   
   const bill = billStore.bills.find(b => b.id === id)
   if (bill) {
     selectedBill.value = id
     amount.value = bill.amount
     description.value = `Expense for ${bill.name}`
-    dueDate.value = bill.dueDate
-    recurringPeriod.value = bill.recurringPeriod || 'NONE'
+    dueDate.value = bill.dueDate ?? null
+    recurringPeriod.value = bill.recurrenceType || RecurrenceType.ONE_TIME
     // Collapse the panel after selection
     expandedPanel.value = null
     expandedAccountPanel.value = null
   }
 }
 
-const formatDateForApi = (date) => {
+const formatDateForApi = (date: string | Date | null): string | null => {
   if (!date) return null
   // Convert to Date object if it's a string
   const d = date instanceof Date ? date : new Date(date)
@@ -838,134 +861,132 @@ const formatDateForApi = (date) => {
   return d.toISOString().replace('Z', '')
 }
 
-const handleSubmit = async () => {
+const handleSubmit = async (): Promise<void> => {
+  if (!amount.value || !dueDate.value) return
+
   try {
-    const expenseData = {
-      billId: selectedBill.value,
-      accountId: selectedAccount.value,
+    const expenseData: ExpenseRequest = {
       amount: amount.value,
-      date: formatDateForApi(new Date()), // Current date and time
+      date: formatDateForApi(dueDate.value) || '',
       description: description.value,
-      paymentMethod: paymentMethod.value,
-      status: status.value,
-      recurringPeriod: recurringPeriod.value,
-      dueDate: formatDateForApi(dueDate.value),
-      notificationEnabled: notificationEnabled.value,
-      category: selectedBill.value ? 'BILL' : 'ACCOUNT' // Set category based on whether it's a bill or account payment
+      categoryId: 1, // TODO: Add category selection to form
+      status: ExpenseStatus.PENDING,
+      billId: selectedBill.value ?? undefined,
+      accountId: selectedAccount.value ?? undefined,
+      notes: ''
     }
-    
+
     await expenseStore.createExpense(expenseData)
-    
-    // Reset form and refresh data
     resetForm()
-    await expenseStore.fetchExpenses()
-    
-    // Switch back to expenses list
     activeTab.value = 'expenses-list'
   } catch (error) {
-    console.error('Failed to create expense:', error)
+    console.error('Error creating expense:', error)
   }
 }
 
-const resetForm = () => {
+const resetForm = (): void => {
   selectedBill.value = null
   selectedAccount.value = null
   amount.value = null
   date.value = new Date().toISOString().substr(0, 10)
   description.value = ''
   paymentMethod.value = null
-  status.value = 'PENDING'
-  recurringPeriod.value = 'NONE'
+  status.value = ExpenseStatus.PENDING
+  recurringPeriod.value = RecurrenceType.ONE_TIME
   dueDate.value = null
   notificationEnabled.value = true
 }
 
-const editItem = (item) => {
-  selectedBill.value = item.billId
-  selectedAccount.value = item.accountId
-  amount.value = item.amount
-  date.value = item.date
-  description.value = item.description
-  paymentMethod.value = item.paymentMethod
-  status.value = item.status
-  recurringPeriod.value = item.recurringPeriod
-  dueDate.value = item.dueDate
-  notificationEnabled.value = item.notificationEnabled
+const editItem = (item: TableItem): void => {
+  if (!item.originalItem) return;
+
+  // For credit cards, use the card's ID as accountId
+  if (item.isCard) {
+    const cardAccount = item.originalItem as Account;
+    if (!isCreditCardAccount(cardAccount)) return;
+
+    selectedAccount.value = cardAccount.id;
+    handleAccountSelection('CREDIT_CARD', cardAccount.id);
+    amount.value = calculateMinimumPayment(
+      cardAccount.creditCardDetails.creditLimit,
+      cardAccount.creditCardDetails.interestRate
+    );
+    description.value = `Payment for ${cardAccount.name}`;
+  } else {
+    // For bills, use the bill's ID
+    const bill = item.originalItem as Bill;
+    selectedBill.value = bill.id;
+    handleBillSelection(bill.id);
+    amount.value = bill.amount;
+    description.value = bill.description || `Payment for ${bill.name}`;
+  }
+  dueDate.value = formatDateOnly(item.dueDate)
+  activeTab.value = 'record'
 }
 
-const deleteExpense = async (item) => {
+const deleteExpense = async (item: TableItem): Promise<void> => {
   try {
-    await expenseStore.deleteExpense(item.id)
+    // Extract numeric ID from string ID if necessary
+    const numericId = typeof item.id === 'string' 
+      ? parseInt(item.id.split('-')[1], 10)  // Extract numeric part from 'cc-123-2-2025' or 'bill-123-2-2025'
+      : item.id
+    await expenseStore.deleteExpense(numericId)
   } catch (error) {
     console.error('Error deleting expense:', error)
   }
 }
 
-const recordPayment = (item) => {
-  // Reset form
-  resetForm()
-  
-  // Set the selected bill or account based on item type
-  if (item.isCard) {
-    selectedAccount.value = item.originalItem.id
-    expandedPanel.value = null
-  } else {
-    selectedBill.value = item.originalItem.id
-    expandedPanel.value = null
-  }
+const recordPayment = async (item: TableItem): Promise<void> => {
+  if (!item.originalItem) return
 
-  // Set amount and description
-  amount.value = item.amount
-  description.value = `Payment for ${item.name}`
-
-  // Set due date based on whether it's an existing expense or new payment
-  if (item.originalItem.type === 'BILL') {
-    const bill = item.originalItem
-    const today = new Date()
-    const currentMonth = today.getMonth()
-    const currentYear = today.getFullYear()
-
-    if (bill.recurrenceType === 'ONE_TIME') {
-      dueDate.value = new Date(bill.dueDate).toISOString().split('T')[0]
-      recurringPeriod.value = 'NONE'
-    } else if (bill.recurrenceType === 'MONTHLY' && bill.dayOfMonth) {
-      const dueDateObj = new Date(currentYear, currentMonth, bill.dayOfMonth)
-      dueDate.value = dueDateObj.toISOString().split('T')[0]
-      recurringPeriod.value = 'MONTHLY'
-    } else if (bill.recurrenceType === 'WEEKLY' && bill.dayOfWeek) {
-      // Find first occurrence of day in current month
-      const dueDateObj = new Date(currentYear, currentMonth, 1)
-      while (dueDateObj.getDay() !== bill.dayOfWeek) {
-        dueDateObj.setDate(dueDateObj.getDate() + 1)
-      }
-      dueDate.value = dueDateObj.toISOString().split('T')[0]
-      recurringPeriod.value = 'WEEKLY'
-    }
-  } else {
-    // For existing expenses or credit cards, use the item's due date
-    dueDate.value = item.dueDate.toISOString().split('T')[0]
-    recurringPeriod.value = item.originalItem.recurringPeriod || 'MONTHLY'
-  }
-
-  // Switch to record tab
-  activeTab.value = 'record'
-}
-
-// Lifecycle hooks
-onMounted(async () => {
   try {
     loading.value = true
-    await Promise.all([
-      expenseStore.fetchExpenses(),
-      billStore.fetchBills(),
-      accountStore.fetchAccounts()
-    ])
+    const expenseData: ExpenseRequest = {
+      description: item.isCard 
+        ? `Payment for ${(item.originalItem as Account).name}`
+        : (item.originalItem as Bill).description || `Payment for ${(item.originalItem as Bill).name}`,
+      amount: item.amount,
+      date: new Date().toISOString(),
+      categoryId: item.category?.id || 1, // Default to first category if none specified
+      status: ExpenseStatus.COMPLETED,
+      billId: item.isCard ? undefined : (item.originalItem as Bill).id,
+      accountId: item.isCard ? (item.originalItem as Account).id : undefined,
+      notes: ''
+    }
+
+    // Extract numeric ID from string ID if necessary
+    const numericId = typeof item.id === 'string' 
+      ? parseInt(item.id.split('-')[1], 10)  // Extract numeric part from 'cc-123-2-2025' or 'bill-123-2-2025'
+      : item.id
+
+    await expenseStore.updateExpense(numericId, expenseData)
+    activeTab.value = 'record'
   } catch (error) {
-    console.error('Error loading data:', error)
+    console.error('Error updating expense:', error)
   } finally {
     loading.value = false
   }
-})
+}
+
+const getExpenseTypeColor = (type: ExpenseType): string => {
+  const colors: Record<string, string> = {
+    'FOOD': 'orange',
+    'TRANSPORTATION': 'blue',
+    'ENTERTAINMENT': 'purple',
+    'SHOPPING': 'pink',
+    'HEALTH': 'green',
+    'EDUCATION': 'indigo',
+    'BILLS': 'red',
+    'OTHER': 'grey'
+  }
+  return colors[type] || 'grey'
+}
+
+const getExpenseTypeTextColor = (type: ExpenseType): string => {
+  return type === ExpenseType.SHOPPING ? 'black' : 'white'
+}
+
+const selectedDate = ref<string | null>(null);
 </script>
 
 <style scoped>

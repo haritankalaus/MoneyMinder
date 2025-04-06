@@ -166,7 +166,7 @@
                 ></v-text-field>
               </v-col>
 
-              <v-col cols="12" sm="6" v-else-if="editedItem.recurrenceType === RecurrenceType.YEARLY">
+              <v-col cols="12" sm="6" v-else-if="editedItem.recurrenceType === RecurrenceType.YEARLY && editedItem.monthAndDay">
                 <v-row>
                   <v-col cols="6">
                     <v-select
@@ -181,7 +181,7 @@
                       v-model.number="editedItem.monthAndDay.day"
                       label="Day"
                       type="number"
-                      min="1"
+                      :min="1"
                       :max="getDaysInMonth(editedItem.monthAndDay.month)"
                       required
                     ></v-text-field>
@@ -191,8 +191,8 @@
 
               <v-col cols="12" sm="6" v-else-if="editedItem.recurrenceType === RecurrenceType.CUSTOM">
                 <v-combobox
-                  v-model="editedItem.customDays"
-                  :items="[]"
+                  v-model="customDaysString"
+                  :items="Array.from({length: 31}, (_, i) => String(i + 1))"
                   label="Custom Days"
                   multiple
                   chips
@@ -236,8 +236,8 @@
 
               <v-col cols="12" sm="12">
                 <v-textarea
-                  v-model="editedItem.notes"
-                  label="Notes"
+                  v-model="editedItem.description"
+                  label="Description"
                   rows="3"
                 ></v-textarea>
               </v-col>
@@ -265,7 +265,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { format } from 'date-fns'
-import type { Bill } from '@/types/bill'
+import type { Bill, BillRequest } from '@/types/bill'
 import { BillType, RecurrenceType } from '@/types/bill'
 import { useAccountStore } from '@/stores/useAccountStore'
 import { useBillStore } from '@/stores/useBillStore'
@@ -284,15 +284,15 @@ const billToDelete = ref<number | null>(null)
 
 const accounts = computed(() => accountStore.accounts)
 
-const headers = [
+const headers: any = [
   { title: 'Name', key: 'name' },
   { title: 'Amount', key: 'amount', align: 'end' },
   { title: 'Due Date', key: 'dueDate' },
   { title: 'Type', key: 'type' },
   { title: 'Recurrence', key: 'recurrenceType' },
   { title: 'Auto Pay', key: 'autoPay', align: 'center' },
-  { title: 'Actions', key: 'actions', sortable: false, align: 'center' }
-]
+  { title: 'Actions', key: 'actions', align: 'center', sortable: false }
+];
 
 const editedItem = ref<Bill>({
   id: 0,
@@ -302,17 +302,24 @@ const editedItem = ref<Bill>({
   description: '',
   recurrenceType: RecurrenceType.MONTHLY,
   dayOfWeek: undefined,
-  monthAndDay: { month: 1, day: 1 },
+  monthAndDay: undefined,
   customDays: [],
   autoPay: false,
   accountId: undefined,
-  paymentMethod: '',  // Changed from undefined to empty string
-  category: '',       // Changed from undefined to empty string
+  paymentMethod: '',  
+  category: '',       
   dueDate: undefined,
   dayOfMonth: undefined,
 })
 
 const editedIndex = ref(-1)
+
+const customDaysString = computed({
+  get: () => editedItem.value.customDays?.map(String) || [],
+  set: (val: string[]) => {
+    editedItem.value.customDays = val.map(v => parseInt(v))
+  }
+})
 
 // Helper data for form
 const daysOfWeek = [
@@ -360,14 +367,16 @@ function formatEnum(value: string) {
 
 function getTypeColor(type: BillType) {
   switch (type) {
-    case BillType.UTILITY:
+    case BillType.UTILITIES:
       return 'blue'
-    case BillType.RENT_MORTGAGE:
+    case BillType.HOME_LOAN:
       return 'purple'
-    case BillType.INSURANCE:
+    case BillType.EMI:
       return 'green'
-    case BillType.SUBSCRIPTION:
+    case BillType.ENTERTAINMENT:
       return 'orange'
+    case BillType.RECURRING:
+      return 'cyan'
     default:
       return 'grey'
   }
@@ -411,7 +420,7 @@ function handleRecurrenceTypeChange() {
   editedItem.value.dueDate = undefined
   editedItem.value.dayOfWeek = undefined
   editedItem.value.dayOfMonth = undefined
-  editedItem.value.monthAndDay = { month: 1, day: 1 }
+  editedItem.value.monthAndDay = undefined
   editedItem.value.customDays = []
 
   // Set default values based on recurrence type
@@ -463,7 +472,7 @@ function cancelEdit() {
     description: '',
     recurrenceType: RecurrenceType.MONTHLY,
     dayOfWeek: undefined,
-    monthAndDay: { month: 1, day: 1 },
+    monthAndDay: undefined,
     customDays: [],
     autoPay: false,
     accountId: undefined,

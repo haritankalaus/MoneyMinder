@@ -1,5 +1,29 @@
-".env" 
-"node_modules/" 
-"target/" 
-"dist/" 
-".idea/" 
+.env 
+node_modules/ 
+target/ 
+dist/ 
+.idea/ 
+
+
+# Spring Boot
+/target/
+*.jar
+*.war
+*.ear
+.settings
+.classpath
+.project
+.mvn
+
+# Vue.js
+node_modules/
+/dist/
+npm-debug.log*
+.vscode
+
+# General
+.idea/
+*.iml
+*.log
+.env
+.DS_Store

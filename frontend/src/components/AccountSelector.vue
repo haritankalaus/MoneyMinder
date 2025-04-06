@@ -2,7 +2,7 @@
   <div>
     <v-select
       v-model="selectedAccount"
-      :items="[...accounts, { id: 'new', name: 'Create New Account', type: '', balance: ''  }]"
+      :items="accounts"
       :label="label"
       :rules="rules"
       item-title="name"
@@ -14,7 +14,8 @@
     >
       <template v-slot:item="{ props, item }">
         <v-list-item v-bind="props" 
-         :title="item.raw.name" :subtitle="formatCurrency(item.raw.balance)">
+         :title="item.raw.name" 
+         :subtitle="item.raw.id !== 'new' ? formatCurrency(item.raw.balance) : ''">
           <template v-slot:append v-if="item.raw.id !== 'new'">
             <v-chip
               :color="getTypeColor(item.raw.type)"
@@ -49,15 +50,26 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import type { PropType } from 'vue'
 import { useAccountStore } from '@/stores/useAccountStore'
 import type { Account } from '@/services/account.service'
 import { AccountType } from '@/services/account.service'
-import { formatEnum, formatCurrency } from '@/utils/formatters'
-import AccountForm from './AccountForm.vue'
+import { formatEnum } from '@/utils/formatters'
+import { formatCurrency } from '@/utils/formatters'
+import AccountForm from '@/components/AccountForm.vue'
+
+interface NewAccountOption {
+  id: 'new'
+  name: string
+  type: AccountType
+  balance: number
+}
+
+type SelectionValue = Account | NewAccountOption
 
 const props = defineProps({
   modelValue: {
-    type: Object as () => Account | null,
+    type: Object as PropType<Account | null>,
     default: null
   },
   label: {
@@ -65,7 +77,7 @@ const props = defineProps({
     default: 'Select Account'
   },
   rules: {
-    type: Array as () => ((value: any) => boolean | string)[],
+    type: Array as PropType<((value: any) => boolean | string)[]>,
     default: () => []
   },
   disabled: {
@@ -73,8 +85,8 @@ const props = defineProps({
     default: false
   },
   filter: {
-    type: Function as () => (account: Account) => boolean,
-    default: () => () => true
+    type: Function as PropType<(account: Account) => boolean>,
+    default: () => (() => true)
   }
 })
 
@@ -84,8 +96,16 @@ const accountStore = useAccountStore()
 const loading = ref(false)
 const showNewAccountDialog = ref(false)
 const savingNewAccount = ref(false)
+
+const newAccountOption: NewAccountOption = {
+  id: 'new',
+  name: 'Create New Account',
+  type: AccountType.CHECKING,
+  balance: 0
+}
+
 const newAccount = ref<Account>({
-  id: '',
+  id: 0,
   name: '',
   balance: 0,
   type: AccountType.CHECKING,
@@ -94,40 +114,38 @@ const newAccount = ref<Account>({
 
 const selectedAccount = computed({
   get: () => props.modelValue,
-  set: (value) => {
-    if (value?.id !== 'new') {
-      emit('update:modelValue', value)
+  set: (value: SelectionValue | null) => {
+    if (value && value.id !== 'new') {
+      emit('update:modelValue', value as Account)
     }
   }
 })
 
 const accounts = computed(() => {
-  return accountStore.accounts.filter(props.filter)
+  return [...accountStore.accounts.filter(props.filter), newAccountOption]
 })
 
-function handleSelection(value: Account | { id: string, name: string }) {
-  if (value?.id === 'new') {
+function handleSelection(value: SelectionValue) {
+  if (value.id === 'new') {
     showNewAccountDialog.value = true
-    selectedAccount.value = props.modelValue // Reset selection
-  } else {
-    emit('update:modelValue', value as Account)
   }
 }
 
 async function handleSaveSuccess() {
   try {
     savingNewAccount.value = true
-    const savedAccount = await accountStore.addAccount(newAccount.value)
-    emit('update:modelValue', savedAccount)
+    await accountStore.createAccount(newAccount.value)
     showNewAccountDialog.value = false
     // Reset the new account form
     newAccount.value = {
-      id: '',
+      id: 0,
       name: '',
       balance: 0,
       type: AccountType.CHECKING,
       accountNumber: ''
     }
+  } catch (error) {
+    console.error('Failed to create account:', error)
   } finally {
     savingNewAccount.value = false
   }

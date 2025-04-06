@@ -56,9 +56,13 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+import AppHeader from '@/components/layout/AppHeader.vue'
 import { useSnackbar } from '@/composables/useSnackbar'
+
 const { t, locale } = useI18n()
-const tab = ref(null)
+const tab = ref<string | null>(null)
 const isRTL = computed(() => locale.value === 'ar')
 
 const sidebarItems = computed(() => [

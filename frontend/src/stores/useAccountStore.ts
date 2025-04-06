@@ -8,6 +8,15 @@ interface AccountState {
   error: string | null
 }
 
+interface AccountTotal {
+  balance: number
+  count: number
+}
+
+type AccountTotals = {
+  [key in AccountType]: AccountTotal
+}
+
 export const useAccountStore = defineStore('account', {
   state: (): AccountState => ({
     accounts: [],
@@ -16,25 +25,25 @@ export const useAccountStore = defineStore('account', {
   }),
   
   getters: {
-    getAccountById: (state) => (id: number) => {
+    getAccountById: (state) => (id: number): Account | undefined => {
       return state.accounts.find(account => account.id === id)
     },
     
-    getAccountsByType: (state) => (type: AccountType) => {
+    getAccountsByType: (state) => (type: AccountType): Account[] => {
       return state.accounts.filter(account => account.type === type)
     },
     
-    accountTotalsByType: (state) => {
+    accountTotalsByType: (state): AccountTotals => {
       // Initialize all account types with zero values
       const totals = Object.values(AccountType).reduce((acc, type) => {
         acc[type] = { balance: 0, count: 0 }
         return acc
-      }, {} as Record<AccountType, { balance: number; count: number }>)
+      }, {} as AccountTotals)
 
-      // Sum up the balances and counts for each account
+      // Calculate totals
       state.accounts.forEach(account => {
         totals[account.type].balance += account.balance
-        totals[account.type].count++
+        totals[account.type].count += 1
       })
 
       return totals
@@ -46,29 +55,31 @@ export const useAccountStore = defineStore('account', {
       this.loading = true
       this.error = null
       try {
-        const data = await accountService.getAllAccounts()
-        this.accounts = data
+        const accounts = await accountService.getAllAccounts()
+        this.accounts = accounts
       } catch (error) {
         this.error = error instanceof Error ? error.message : 'Failed to fetch accounts'
-      } finally {
-        this.loading = false
-      }
-    },
-    
-    async addAccount(account: Omit<Account, 'id'>) {
-      this.loading = true
-      this.error = null
-      try {
-        const newAccount = await accountService.createAccount(account)
-        this.accounts.push(newAccount)
-      } catch (error) {
-        this.error = error instanceof Error ? error.message : 'Failed to add account'
         throw error
       } finally {
         this.loading = false
       }
     },
-    
+
+    async createAccount(account: Omit<Account, 'id'>) {
+      this.loading = true
+      this.error = null
+      try {
+        const newAccount = await accountService.createAccount(account)
+        this.accounts.push(newAccount)
+        return newAccount
+      } catch (error) {
+        this.error = error instanceof Error ? error.message : 'Failed to create account'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
     async updateAccount(id: number, updates: Partial<Account>) {
       this.loading = true
       this.error = null
@@ -78,6 +89,7 @@ export const useAccountStore = defineStore('account', {
         if (index !== -1) {
           this.accounts[index] = updatedAccount
         }
+        return updatedAccount
       } catch (error) {
         this.error = error instanceof Error ? error.message : 'Failed to update account'
         throw error
@@ -85,12 +97,11 @@ export const useAccountStore = defineStore('account', {
         this.loading = false
       }
     },
-    
+
     async deleteAccount(id: number) {
       this.loading = true
       this.error = null
       try {
-        // TODO: Replace with actual API call
         await accountService.deleteAccount(id)
         this.accounts = this.accounts.filter(a => a.id !== id)
       } catch (error) {

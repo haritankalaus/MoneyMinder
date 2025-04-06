@@ -30,7 +30,7 @@
               </template>
               <div class="d-flex flex-column">
                 <div class="text-subtitle-2 text-medium-emphasis mb-1">Available Balance</div>
-                <div class="text-h5 font-weight-bold">${{ formatNumber(dashboardStore.stats?.accountBalance ?? 0) }}</div>
+                <div class="text-h5 font-weight-bold">${{ formatNumber(dashboardStore.stats?.balance || 0) }}</div>
               </div>
             </v-card-item>
           </v-card>
@@ -44,9 +44,9 @@
               </template>
               <div class="d-flex flex-column">
                 <div class="text-subtitle-2 text-medium-emphasis mb-1">Monthly Income</div>
-                <div class="text-h5 font-weight-bold">${{ formatNumber(dashboardStore.stats?.monthlyIncome ?? 0) }}</div>
+                <div class="text-h5 font-weight-bold">${{ formatNumber(dashboardStore.stats?.monthlyIncome || 0) }}</div>
                 <div class="text-caption text-medium-emphasis">
-                  Next paydate: {{ dashboardStore.stats?.nextPaydate?.toLocaleDateString() }}
+                  Next paydate: {{ dashboardStore.stats?.nextPaydate ? new Date(dashboardStore.stats.nextPaydate).toLocaleDateString() : 'Not set' }}
                 </div>
               </div>
             </v-card-item>
@@ -61,7 +61,7 @@
               </template>
               <div class="d-flex flex-column">
                 <div class="text-subtitle-2 text-medium-emphasis mb-1">Monthly Expenses</div>
-                <div class="text-h5 font-weight-bold">${{ formatNumber(dashboardStore.stats?.monthlyExpenses ?? 0) }}</div>
+                <div class="text-h5 font-weight-bold">${{ formatNumber(dashboardStore.stats?.monthlyExpenses || 0) }}</div>
               </div>
             </v-card-item>
           </v-card>
@@ -75,8 +75,8 @@
               </template>
               <div class="d-flex flex-column">
                 <div class="text-subtitle-2 text-medium-emphasis mb-1">Savings Goal</div>
-                <div class="text-h5 font-weight-bold">${{ formatNumber(dashboardStore.stats?.savingsGoal ?? 0) }}</div>
-                <div class="text-caption text-success">+{{ dashboardStore.stats?.savingsProgress ?? 0 }}% this month</div>
+                <div class="text-h5 font-weight-bold">${{ formatNumber(dashboardStore.stats?.savingsGoal || 0) }}</div>
+                <div class="text-caption text-success">+{{ dashboardStore.stats?.savingsProgress || 0 }}% this month</div>
               </div>
             </v-card-item>
           </v-card>
@@ -139,7 +139,7 @@
             </v-card-title>
             <v-divider></v-divider>
             <UpcomingPayments
-              :payments-due="paymentsDue"
+              :payments="paymentsDue"
               @record-payment="handleRecordPayment"
             />
           </v-card>
@@ -236,8 +236,10 @@ import {
 import VChart from 'vue-echarts'
 import { useDashboardStore } from '@/stores/useDashboardStore'
 import { useExpenseStore } from '@/stores/useExpenseStore'
+import type { Payment } from '@/types/dashboard'
 import BillsOverview from './components/BillsOverview.vue'
 import UpcomingPayments from '@/pages/expenses/components/UpcomingPayments.vue'
+import type { PaymentStatus } from '@/types/payment'
 
 // Register ECharts components
 use([
@@ -264,14 +266,22 @@ onMounted(async () => {
 const upcomingPayments = computed(() => {
   const today = new Date()
   const thirtyDaysFromNow = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000))
-  console.log('today', expenseStore.expenses)
-  console.log('thirtyDaysFromNow', thirtyDaysFromNow)
   return expenseStore.expenses
     .filter(expense => {
-      const dueDate = new Date(expense.dueDate)
-      return dueDate >= today && dueDate <= thirtyDaysFromNow && !expense.paid
+      const expenseDate = new Date(expense.date)
+      return expenseDate >= today && expenseDate <= thirtyDaysFromNow && expense.status === 'PENDING'
     })
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .map(expense => ({
+      id: expense.id,
+      title: expense.description,
+      amount: expense.amount,
+      dueDate: new Date(expense.date),
+      category: expense.category,
+      status: expense.status === 'PENDING' ? 'pending' : 'paid',
+      isCard: expense.category.type === 'BILLS',
+      originalItem: expense
+    }))
+    .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
     .slice(0, 5) // Show only the next 5 upcoming payments
 })
 
@@ -392,18 +402,35 @@ const paymentsDue = computed(() => {
   
   return expenseStore.expenses
     .filter(expense => {
-      const expenseDate = new Date(expense.dueDate)
+      const expenseDate = new Date(expense.date)
       return expenseDate.getMonth() === currentMonth && 
              expenseDate.getFullYear() === currentYear
     })
     .map(expense => ({
-      ...expense,
-      isCard: expense.type === 'CREDIT_CARD'
+      id: expense.id,
+      title: expense.description,
+      amount: expense.amount,
+      dueDate: new Date(expense.date),
+      category: expense.category,
+      status: expense.status === 'PENDING' ? 'pending' as PaymentStatus : 'paid' as PaymentStatus,
+      isCard: expense.category.type === 'BILLS',
+      originalItem: expense
     }))
 })
 
+interface TableItem {
+  id: number | string;
+  title: string;
+  amount: number;
+  dueDate: Date;
+  status: string;
+  isCard?: boolean;
+  originalItem?: any;
+  category?: any;
+}
+
 // Handler for recording payments
-function handleRecordPayment(payment) {
+function handleRecordPayment(payment: Payment | TableItem): void {
   // Navigate to expenses page with the payment details
   router.push({
     name: 'expenses',

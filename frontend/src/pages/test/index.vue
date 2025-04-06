@@ -82,7 +82,7 @@
   import { useI18n } from "vue-i18n";
   
   const { t } = useI18n();
-  const range = ref([]);
+  const range = ref<Date[]>([]);
   const menu = ref(false);
   const model = defineModel<Date[]>();
   const dates = computed({
@@ -91,10 +91,13 @@
   });
   
   const dateRangeText = computed(() => {
-    if (model.value == undefined || model.value.length == 0) {
+    if (!model.value?.length) {
       return t("");
     }
-    const [start, end] = unref(model);
+    const modelValue = unref(model);
+    if (!modelValue) return t("");
+    
+    const [start, end] = modelValue;
     if (!!start && !!end) {
       return `${t("")} ${start.toLocaleDateString()} ${t(
         "-"
@@ -106,8 +109,14 @@
     }
   });
   
-  function updateRange(date) {
-    const [start, end] = unref(range);
+  function updateRange(date: Date) {
+    const rangeValue = unref(range);
+    if (!rangeValue || !Array.isArray(rangeValue)) {
+      range.value = [date];
+      return;
+    }
+    
+    const [start, end] = rangeValue;
     //if everything is null or everything is not
     if (!!start === !!end) {
       range.value = [date];
@@ -136,7 +145,7 @@
     }
   }
   
-  function isToday(date) {
+  function isToday(date: Date) {
     const today = new Date(Date.now());
     today.setHours(0, 0, 0, 0);
     return today.getTime() == date.getTime();

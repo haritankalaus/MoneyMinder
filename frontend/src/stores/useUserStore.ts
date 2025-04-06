@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { apiService } from '@/services/api.service'
+import type { AxiosResponse } from 'axios'
 
 interface UserPreferences {
   id: number
@@ -20,10 +21,12 @@ export const useUserStore = defineStore('user', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiService.get('/api/person/preferences')
-      preferences.value = response.data
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'Failed to fetch user preferences'
+      const response: AxiosResponse<UserPreferences> = await apiService.get('/api/person/preferences')
+      if (response && 'data' in response) {
+        preferences.value = response.data
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to fetch user preferences'
       // Set default preferences if none exist
       preferences.value = {
         id: 0,
@@ -39,10 +42,12 @@ export const useUserStore = defineStore('user', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await apiService.put('/api/person/preferences', updates)
-      preferences.value = response.data
-    } catch (err: any) {
-      error.value = err.response?.data?.message || 'Failed to update preferences'
+      const response: AxiosResponse<UserPreferences> = await apiService.put('/api/person/preferences', updates)
+      if (response && 'data' in response) {
+        preferences.value = response.data
+      }
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to update preferences'
       throw err
     } finally {
       loading.value = false

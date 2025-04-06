@@ -192,7 +192,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useBudgetStore } from '@/stores/useBudgetStore'
-import type { Budget, BudgetStatus } from '@/types/budget'
+import { useSnackbar } from '@/composables/useSnackbar'
+import type { Budget, BudgetSummary } from '@/types/budget'
 import BudgetDialog from './components/BudgetDialog.vue'
 
 const router = useRouter()
@@ -200,14 +201,16 @@ const budgetStore = useBudgetStore()
 
 const showCreateDialog = ref(false)
 const showDeleteDialog = ref(false)
-const selectedBudget = ref<Budget | null>(null)
+const selectedBudget = ref<BudgetSummary | null>(null)
 
-const headers = [
+const headers: any = [
   { title: 'Period', key: 'period' },
   { title: 'Total Budget', key: 'totalBudget', align: 'end' },
   { title: 'Actual Spending', key: 'totalActual', align: 'end' },
   { title: 'Status', key: 'status' },
-  { title: 'Actions', key: 'actions', sortable: false, align: 'end' }
+  { title: 'Progress', key: 'progress', align: 'end' },
+  { title: 'Days Left', key: 'remainingDays', align: 'end' },
+  { title: 'Actions', key: 'actions', sortable: false, align: 'center' }
 ]
 
 onMounted(async () => {
@@ -232,7 +235,7 @@ function formatNumber(value: number): string {
   }).format(value)
 }
 
-function getBudgetStatusColor(status: BudgetStatus): string {
+function getBudgetStatusColor(status: BudgetSummary['status']): string {
   switch (status) {
     case 'ACTIVE':
       return 'success'
@@ -255,7 +258,7 @@ async function handleCreateBudget(budget: Omit<Budget, 'id'>) {
   }
 }
 
-function confirmDelete(budget: Budget) {
+function confirmDelete(budget: BudgetSummary) {
   selectedBudget.value = budget
   showDeleteDialog.value = true
 }
@@ -282,4 +285,3 @@ async function handleDeleteBudget() {
   meta:
     layout: DashboardLayout
   </route>
-  

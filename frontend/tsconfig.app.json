@@ -3,7 +3,8 @@
     "env.d.ts",
     "src/**/*",
     "auto-imports.d.ts",
-    "src/**/*.vue"
+    "src/**/*.vue",
+    "src/types/**/*.d.ts"
   ],
   "exclude": [
     "src/**/__tests__/*"

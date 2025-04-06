@@ -37,7 +37,7 @@
               <v-col v-for="(total, type) in accountTotalsByType" :key="type" cols="12" sm="6">
                 <v-expansion-panel>
                   <v-expansion-panel-title>
-                    {{ formatEnum(type) + ' (' + formatCurrency(total.balance) + ')' }}
+                    {{ formatEnum(type) + ' (' + total.balance.toLocaleString('en-US', { style: 'currency', currency: selectedCurrency }) + ')' }}
                     <v-spacer></v-spacer>
                       <v-chip
                         :color="getTypeColor(type as AccountType)"
@@ -56,7 +56,7 @@
                       class="elevation-1"
                     >
                       <template v-slot:item.balance="{ item }">
-                        {{ formatCurrency(item.balance) }}
+                        {{ item.balance.toLocaleString('en-US', { style: 'currency', currency: selectedCurrency }) }}
                       </template>
                       <template v-slot:item.actions="{ item }">
                         <v-icon size="small" class="me-2" @click="editItem(item)">
@@ -67,10 +67,10 @@
                         </v-icon>
                       </template>
                       <template v-slot:item.creditCardDetails.creditLimit="{ item }">
-                        {{ formatCurrency(item.creditCardDetails?.creditLimit) }}
+                        {{ item.creditCardDetails?.creditLimit.toLocaleString('en-US', { style: 'currency', currency: selectedCurrency }) }}
                       </template>
                       <template v-slot:item.loanDetails.monthlyPayment="{ item }">
-                        {{ formatCurrency(item.loanDetails?.monthlyPayment) }}
+                        {{ item.loanDetails?.monthlyPayment.toLocaleString('en-US', { style: 'currency', currency: selectedCurrency }) }}
                       </template>
                     </v-data-table>
                   </v-expansion-panel-text>
@@ -106,16 +106,15 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import type { Account } from '@/services/account.service'
+import type { Account} from '@/services/account.service'
 import { AccountType, LoanType } from '@/services/account.service'
-import { formatEnum, formatCurrency } from '@/utils/formatters'
+import { formatEnum } from '@/utils/formatters'
 import { useAccountStore } from '@/stores/useAccountStore'
 import { useUserStore } from '@/stores/useUserStore'
-import AccountForm from '@/components/AccountForm.vue'
-import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
+import { useSnackbar } from '@/composables/useSnackbar'
 
-const accountStore = useAccountStore()
 const userStore = useUserStore()
+const accountStore = useAccountStore()
 const { showSuccess, showError } = useSnackbar()
 
 const form = ref<any>(null)
@@ -124,10 +123,11 @@ const activeTab = ref('list')
 const confirmDialog = ref(false)
 
 // Currency handling
-const currencies = ['$', '₹']
+const currencies = ['USD', 'INR']
 const selectedCurrency = ref(userStore.getCurrency())
 
-const updateCurrency = async (currency: string) => {
+// Update currency preference
+async function updateCurrency(currency: string) {
   try {
     await userStore.updatePreferences({ currency })
     showSuccess('Currency updated successfully')
@@ -136,13 +136,6 @@ const updateCurrency = async (currency: string) => {
     // Revert to previous currency if update fails
     selectedCurrency.value = userStore.getCurrency()
   }
-}
-
-// Format currency with the selected currency symbol
-const formatCurrency = (amount: number) => {
-  return selectedCurrency.value === '₹' 
-    ? `₹${amount.toLocaleString('en-IN')}`
-    : `$${amount.toLocaleString('en-US')}`
 }
 
 const accounts = computed(() => accountStore.accounts)
@@ -176,7 +169,8 @@ const getHeaders = (type: AccountType) => {
 const accountTypes = Object.values(AccountType)
 const loanTypes = Object.values(LoanType)
 
-const defaultItem = {
+const defaultItem: Account = {
+  id: 0,
   name: '',
   accountNumber: '',
   balance: 0,
@@ -192,23 +186,18 @@ const defaultItem = {
     loanType: LoanType.PERSONAL_LOAN,
     monthlyPayment: 0,
     paymentDueDay: 1,
+    startDate: new Date().toISOString(),
+    endDate: new Date().toISOString(),
     interestRate: 0,
     totalLoanAmount: 0,
-    startDate: '',
-    endDate: '',
-  },
+    remainingAmount: 0
+  }
 }
 
 const editedItem = ref({ ...defaultItem })
 const editedIndex = ref(-1)
 
 // Methods
-function formatEnum(value: string) {
-  return value.split('_').map(word => 
-    word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-  ).join(' ')
-}
-
 function getTypeColor(type: AccountType) {
   const colors = {
     [AccountType.CHECKING]: 'primary',
@@ -270,13 +259,28 @@ async function confirmDelete() {
 // Add new account of specific type
 const addItem = (type: AccountType) => {
   editedItem.value = {
-    id: '',
+    id: 0,
     name: '',
-    type: type,
+    accountNumber: '',
     balance: 0,
-    currency: selectedCurrency.value,
-    isActive: true,
-    notes: ''
+    type: type,
+    creditCardDetails: type === AccountType.CREDIT_CARD ? {
+      billGenerateDay: 1,
+      paymentDueDay: 15,
+      interestRate: 0,
+      latePaymentFee: 0,
+      creditLimit: 0,
+    } : undefined,
+    loanDetails: type === AccountType.LOAN ? {
+      loanType: LoanType.PERSONAL_LOAN,
+      monthlyPayment: 0,
+      paymentDueDay: 1,
+      startDate: '',
+      endDate: '',
+      interestRate: 0,
+      totalLoanAmount: 0,
+      remainingAmount: 0
+    } : undefined
   }
   activeTab.value = 'edit'
 }

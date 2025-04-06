@@ -135,7 +135,7 @@ const showCreateDialog = ref(false)
 const showDeleteDialog = ref(false)
 const selectedPayment = ref<Payment | null>(null)
 
-const headers = [
+const headers: any = [
   { title: 'Description', key: 'description' },
   { title: 'Amount', key: 'amount', align: 'end' },
   { title: 'Due Date', key: 'dueDate' },
@@ -168,8 +168,8 @@ function formatNumber(value: number): string {
   }).format(value)
 }
 
-function formatDate(date: string): string {
-  return format(new Date(date), 'MMM dd, yyyy')
+function formatDate(date: Date): string {
+  return format(date, 'MMM dd, yyyy')
 }
 
 function getStatusColor(status: string): string {
@@ -223,4 +223,3 @@ async function handleDeletePayment() {
   meta:
     layout: DashboardLayout
   </route>
-  

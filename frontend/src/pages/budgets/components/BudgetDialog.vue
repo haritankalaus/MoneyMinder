@@ -141,7 +141,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { Budget } from '@/types/budget'
+import type { Budget, BudgetCategory } from '@/types/budget'
+import type { Category } from '@/types/dashboard'
 
 interface Props {
   modelValue: boolean
@@ -151,6 +152,19 @@ interface Props {
 interface Emits {
   (e: 'update:modelValue', value: boolean): void
   (e: 'save', budget: Omit<Budget, 'id'>): void
+}
+
+interface CategoryFormData {
+  categoryId: string
+  budgetAmount: number
+  notes?: string
+}
+
+interface BudgetFormData {
+  period: string
+  totalBudget: number
+  categories: CategoryFormData[]
+  notes?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -169,23 +183,22 @@ const dialogModel = computed({
 
 const isEdit = computed(() => !!props.budget)
 
-// Mock categories - replace with actual categories from your store
-const categories = [
-  { id: '1', name: 'Food & Dining' },
-  { id: '2', name: 'Transportation' },
-  { id: '3', name: 'Housing' },
-  { id: '4', name: 'Entertainment' },
-  { id: '5', name: 'Shopping' }
+const categories: Category[] = [
+  { id: '1', name: 'Food & Dining', color: '#4CAF50', icon: 'mdi-food' },
+  { id: '2', name: 'Transportation', color: '#2196F3', icon: 'mdi-car' },
+  { id: '3', name: 'Housing', color: '#9C27B0', icon: 'mdi-home' },
+  { id: '4', name: 'Entertainment', color: '#FF9800', icon: 'mdi-movie' },
+  { id: '5', name: 'Shopping', color: '#E91E63', icon: 'mdi-shopping' }
 ]
 
-const defaultFormData = {
+const defaultFormData: BudgetFormData = {
   period: '',
   totalBudget: 0,
   categories: [],
   notes: ''
 }
 
-const formData = ref({ ...defaultFormData })
+const formData = ref<BudgetFormData>({ ...defaultFormData })
 
 watch(() => props.budget, (newBudget) => {
   if (newBudget) {
@@ -222,12 +235,36 @@ async function handleSubmit() {
 
   loading.value = true
   try {
+    const transformedCategories: BudgetCategory[] = formData.value.categories.map(cat => {
+      const category = categories.find(c => c.id === cat.categoryId)
+      if (!category) {
+        throw new Error(`Category with id ${cat.categoryId} not found`)
+      }
+      return {
+        id: crypto.randomUUID(),
+        category: {
+          id: category.id,
+          name: category.name,
+          color: category.color,
+          icon: category.icon
+        },
+        budgetAmount: cat.budgetAmount,
+        actualAmount: 0,
+        notes: cat.notes
+      }
+    })
+
     emit('save', {
       period: formData.value.period,
       totalBudget: formData.value.totalBudget,
-      categories: formData.value.categories,
+      categories: transformedCategories,
       notes: formData.value.notes,
-      status: 'DRAFT'
+      status: 'DRAFT',
+      totalActual: 0,
+      person: {
+        id: '1',
+        name: 'User'
+      }
     })
   } finally {
     loading.value = false

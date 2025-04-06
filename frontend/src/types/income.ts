@@ -38,4 +38,5 @@ export interface IncomeRequest {
     nextDueDate?: string;
     currency: string;
     description?: string;
+    accountId?: number;
 }

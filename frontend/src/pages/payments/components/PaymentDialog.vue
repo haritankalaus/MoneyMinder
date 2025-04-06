@@ -64,16 +64,6 @@
                 required
               />
             </v-col>
-
-            <!-- Notes -->
-            <v-col cols="12">
-              <v-textarea
-                v-model="formData.notes"
-                label="Notes"
-                rows="3"
-                placeholder="Optional payment notes"
-              />
-            </v-col>
           </v-row>
         </v-form>
       </v-card-text>
@@ -113,6 +103,15 @@ interface Emits {
   (e: 'save', payment: Omit<Payment, 'id'>): void
 }
 
+interface FormData {
+  title: string;
+  description: string;
+  amount: number;
+  dueDate: string;
+  categoryId: string;
+  status: 'pending' | 'paid' | 'overdue';
+}
+
 const props = withDefaults(defineProps<Props>(), {
   modelValue: false
 })
@@ -131,33 +130,33 @@ const isEdit = computed(() => !!props.payment)
 
 // Mock categories - replace with actual categories from your store
 const categories = [
-  { id: '1', name: 'Bills & Utilities' },
-  { id: '2', name: 'Rent/Mortgage' },
-  { id: '3', name: 'Insurance' },
-  { id: '4', name: 'Subscriptions' },
-  { id: '5', name: 'Other' }
+  { id: '1', name: 'Housing', color: '#4CAF50', icon: 'mdi-home' },
+  { id: '2', name: 'Transportation', color: '#2196F3', icon: 'mdi-car' },
+  { id: '3', name: 'Food', color: '#FF9800', icon: 'mdi-food' },
+  { id: '4', name: 'Utilities', color: '#9C27B0', icon: 'mdi-flash' },
+  { id: '5', name: 'Other', color: '#607D8B', icon: 'mdi-dots-horizontal' }
 ]
 
-const defaultFormData = {
+const defaultFormData: FormData = {
+  title: '',
   description: '',
   amount: 0,
-  dueDate: '',
+  dueDate: new Date().toISOString().split('T')[0],
   categoryId: '',
-  status: 'PENDING',
-  notes: ''
+  status: 'pending'
 }
 
-const formData = ref({ ...defaultFormData })
+const formData = ref<FormData>({ ...defaultFormData })
 
 watch(() => props.payment, (newPayment) => {
   if (newPayment) {
     formData.value = {
-      description: newPayment.description,
+      title: newPayment.title || '',
+      description: newPayment.description || '',
       amount: newPayment.amount,
       dueDate: new Date(newPayment.dueDate).toISOString().split('T')[0],
-      categoryId: newPayment.category.id,
-      status: newPayment.status,
-      notes: newPayment.notes || ''
+      categoryId: newPayment.category?.id || '',
+      status: newPayment.status
     }
   } else {
     formData.value = { ...defaultFormData }
@@ -170,14 +169,24 @@ async function handleSubmit() {
 
   loading.value = true
   try {
-    emit('save', {
+    const selectedCategory = categories.find(c => c.id === formData.value.categoryId)
+    if (!selectedCategory) {
+      throw new Error('Category not found')
+    }
+
+    const paymentData: Omit<Payment, 'id'> = {
+      title: formData.value.title,
       description: formData.value.description,
       amount: formData.value.amount,
       dueDate: new Date(formData.value.dueDate),
-      category: categories.find(c => c.id === formData.value.categoryId)!,
-      status: formData.value.status,
-      notes: formData.value.notes
-    })
+      category: selectedCategory,
+      status: formData.value.status as 'pending' | 'paid' | 'overdue'
+    }
+
+    emit('save', paymentData)
+    emit('update:modelValue', false)
+  } catch (error) {
+    console.error('Error creating payment:', error)
   } finally {
     loading.value = false
   }

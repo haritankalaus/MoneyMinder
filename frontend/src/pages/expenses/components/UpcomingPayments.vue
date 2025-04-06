@@ -5,7 +5,7 @@
     </v-card-title>
     <v-data-table
       :headers="headers"
-      :items="paymentsDue"
+      :items="payments"
       :sort-by="[{ key: 'dueDate', order: 'asc' }]"
       class="elevation-1"
     >
@@ -48,19 +48,23 @@
   </v-card>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { format } from 'date-fns'
+import type { PropType } from 'vue'
+import type { TableItem } from '@/types/payment'
 
 defineProps({
-  paymentsDue: {
-    type: Array,
+  payments: {
+    type: Array as PropType<TableItem[]>,
     required: true
   }
 })
 
-defineEmits(['record-payment'])
+defineEmits<{
+  (e: 'record-payment', payment: TableItem): void
+}>()
 
-const headers = [
+const headers : any = [ 
   { title: 'Name', key: 'name', align: 'start' },
   { title: 'Type', key: 'type' },
   { title: 'Amount', key: 'amount' },
@@ -69,40 +73,38 @@ const headers = [
   { title: 'Actions', key: 'actions', sortable: false }
 ]
 
-function getStatusColor(status) {
-  const colors = {
-    'PAID': 'success',
-    'PENDING': 'warning',
-    'OVERDUE': 'error',
-    'UPCOMING': 'info'
+function getStatusColor(status: string): string {
+  switch (status.toLowerCase()) {
+    case 'pending':
+      return 'warning'
+    case 'paid':
+      return 'success'
+    case 'overdue':
+      return 'error'
+    default:
+      return 'grey'
   }
-  return colors[status] || 'grey'
 }
 
-function getStatusTextColor(status) {
-  return status === 'PENDING' ? 'black' : 'white'
+function getStatusTextColor(status: string): string {
+  return status.toLowerCase() === 'pending' ? 'black' : 'white'
 }
 
-function formatDateOnly(date) {
-  if (!date) return ''
-  return format(new Date(date), 'MMM dd, yyyy')
+function formatDateOnly(date: Date): string {
+  return format(new Date(date), 'MMM d, yyyy')
 }
 
-function getDueDateClass(dueDate) {
-  if (!dueDate) return ''
-  
+function getDueDateClass(dueDate: Date): string {
   const today = new Date()
   const due = new Date(dueDate)
-  const diffTime = due.getTime() - today.getTime()
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  
-  if (diffDays < 0) return 'text-error' // Overdue
-  if (diffDays <= 3) return 'text-warning' // Due soon
+  const daysUntilDue = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (daysUntilDue < 0) return 'text-error'
+  if (daysUntilDue <= 3) return 'text-warning'
   return ''
 }
 
-function formatCurrency(value) {
-  if (!value) return '$0.00'
+function formatCurrency(value: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD'

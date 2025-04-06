@@ -236,6 +236,11 @@ import { IncomeType, RecurrenceType } from '@/types/income'
 import { useSnackbar } from '@/composables/useSnackbar'
 import ConfirmDialog from '@/components/shared/ConfirmDialog.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
+import type { Account } from '@/services/account.service'
+
+interface ExtendedIncome extends Income {
+  account?: Account | null;
+}
 
 const { showSuccess, showError } = useSnackbar()
 
@@ -246,29 +251,33 @@ const selectedItem = ref<Income | null>(null)
 const activeTab = ref('list')
 const dateMenu = ref(false)
 
-const editedItem = ref<IncomeRequest>({
-  id: '',
+const editedItem = ref<ExtendedIncome>({
+  id: 0,
   name: '',
   amount: 0,
   type: IncomeType.SALARY,
   recurrenceType: RecurrenceType.MONTHLY,
   currency: 'USD',
-  description: '',
-  account: ''
+  isActive: true,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  account: null
 })
 
-const defaultItem: IncomeRequest = {
-  id: '',
+const defaultItem: ExtendedIncome = {
+  id: 0,
   name: '',
   amount: 0,
   type: IncomeType.SALARY,
   recurrenceType: RecurrenceType.MONTHLY,
   currency: 'USD',
-  description: '',
-  account: ''
+  isActive: true,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  account: null
 }
 
-const headers = [
+const headers: any = [
   { title: 'Name', key: 'name' },
   { title: 'Amount', key: 'amount' },
   { title: 'Type', key: 'type' },
@@ -341,22 +350,33 @@ function cancelEdit() {
   activeTab.value = 'list'
 }
 
-async function save() {
-  if (!form.value?.validate()) return
-
-  loading.value = true
+const save = async () => {
   try {
-    if (editedItem.value.id) {
-      await incomeService.updateIncome(editedItem.value.id, editedItem.value)
-    } else {
-      await incomeService.createIncome(editedItem.value)
+    loading.value = true
+    const incomeData: IncomeRequest = {
+      name: editedItem.value.name,
+      amount: editedItem.value.amount,
+      type: editedItem.value.type,
+      recurrenceType: editedItem.value.recurrenceType,
+      recurrenceDay: editedItem.value.recurrenceDay,
+      nextDueDate: editedItem.value.nextDueDate,
+      currency: editedItem.value.currency,
+      description: editedItem.value.description,
+      accountId: editedItem.value.account?.id
     }
+
+    if (editedItem.value.id) {
+      await incomeService.updateIncome(editedItem.value.id, incomeData)
+    } else {
+      await incomeService.createIncome(incomeData)
+    }
+
     activeTab.value = 'list'
     editedItem.value = { ...defaultItem }
     await fetchIncomes()
   } catch (error) {
+    console.error('Error saving income:', error)
     showError('Failed to save income')
-    console.error(error)
   } finally {
     loading.value = false
   }
